@@ -1,20 +1,34 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# FractureAI Diagnostic Station
 
-# Run and deploy your AI Studio app
+A web-based workstation designed for analyzing medical scans (like X-Rays, CT, and MRI) to help detect fractures and anomalies using AI.
 
-This contains everything you need to run your app locally.
+## How to run it locally
 
-View your app in AI Studio: https://ai.studio/apps/553fa050-2fa8-4f5a-b5cd-9b2a5c936cc3
+First, make sure you have Node.js installed.
 
-## Run Locally
+1. Install the project dependencies:
+   ```bash
+   npm install
+   ```
 
-**Prerequisites:**  Node.js
+2. Create a `.env` or `.env.local` file in the root directory and add your Gemini API key:
+   ```env
+   GEMINI_API_KEY=your_api_key_here
+   ```
 
+3. Start the development server:
+   ```bash
+   npm run dev
+   ```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+Open `http://localhost:3000` in your browser to see the app.
+
+## Technologies used
+- React & Vite
+- TailwindCSS for styling
+- Express (custom backend)
+- Gemini API (for the image analysis)
+
+## Notes
+- The default login is bypassed in the UI for development, but you can configure actual authentication later.
+- Make sure your API key has access to `gemini-3.6-flash` (or update `server.ts` to use a different model).
