@@ -32,3 +32,11 @@ Open `http://localhost:3000` in your browser to see the app.
 ## Notes
 - The default login is bypassed in the UI for development, but you can configure actual authentication later.
 - **Temporary AI Model:** We are currently using the Gemini API (`gemini-3.6-flash`) as a placeholder while our custom bone fracture detection model finishes training. Ensure your API key has access to this version, or update `server.ts` to use an alternative model.
+
+## 📚 Academic & Intellectual Property
+
+This project represents the practical implementation for an upcoming scientific paper (In Preparation) on automated bone fracture detection using object detection models and Explainable AI (XAI).
+
+**Concept & Methodology Rights:** All rights regarding the system architecture, the integration of YOLOv12 with Grad-CAM, and the scientific methodology are fully reserved by the development team. Reproducing the system or adapting the research idea for academic publication without citing this repository (and the upcoming paper) is strictly prohibited.
+
+**Frontend Source Code:** The frontend source code is open-sourced and available for learning purposes under the MIT License.
