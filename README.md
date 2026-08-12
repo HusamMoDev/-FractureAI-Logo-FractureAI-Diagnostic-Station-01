@@ -29,6 +29,40 @@ Open `http://localhost:3000` in your browser to see the app.
 - Express (custom backend)
 - Custom AI Model for Bone Fracture Detection (Currently in training phase / not yet complete)
 
+## 📂 Project Structure (Monorepo)
+
+```text
+Smart-Bone-Fracture-System/
+├── frontend/
+│   ├── screens/                  # (شاشات وصفحات النظام الرئيسية)
+│   ├── components/               # (المكونات المشتركة القابلة لإعادة الاستخدام)
+│   ├── services/                 # (الخدمات والاتصال بالواجهات الخلفية)
+│   ├── data/                     # (البيانات المؤقتة - Mock data)
+│   ├── assets/                   # (الصور والملفات الثابتة)
+│   ├── App.tsx
+│   ├── main.tsx
+│   ├── types.ts
+│   ├── index.css
+│   ├── index.html
+│   ├── server.ts                 # (خادم التطوير الحالي للواجهات)
+│   ├── package.json
+│   ├── vite.config.ts
+│   └── tsconfig.json
+├── backend/                      # (الواجهات الخلفية - جاهزة للبرمجة)
+│   ├── routes/
+│   ├── controllers/
+│   ├── models_db/
+│   └── uploads/
+├── ai_engine/                    # (محرك الذكاء الاصطناعي - جاهز للتدريب)
+│   ├── yolo_training/
+│   ├── grad_cam/
+│   ├── weights/
+│   └── inference.py
+├── .gitignore
+├── README.md
+└── LICENSE
+```
+
 ## Notes
 - The default login is bypassed in the UI for development, but you can configure actual authentication later.
 - **Temporary AI Model:** We are currently using the Gemini API (`gemini-3.6-flash`) as a placeholder while our custom bone fracture detection model finishes training. Ensure your API key has access to this version, or update `server.ts` to use an alternative model.
