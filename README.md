@@ -11,7 +11,7 @@ First, make sure you have Node.js installed.
    npm install
    ```
 
-2. Create a `.env` or `.env.local` file in the root directory and add your Gemini API key:
+2. Create a `.env` or `.env.local` file in the root directory and add your Gemini API key *(Note: This is a temporary requirement while the custom model is in training)*:
    ```env
    GEMINI_API_KEY=your_api_key_here
    ```
