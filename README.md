@@ -33,6 +33,16 @@ Open `http://localhost:3000` in your browser to see the app.
 
 ```text
 Smart-Bone-Fracture-System/
+├── ai_engine/                    # (محرك الذكاء الاصطناعي - جاهز للتدريب)
+│   ├── yolo_training/
+│   ├── grad_cam/
+│   ├── weights/
+│   └── inference.py
+├── backend/                      # (الواجهات الخلفية - جاهزة للبرمجة)
+│   ├── routes/
+│   ├── controllers/
+│   ├── models_db/
+│   └── uploads/
 ├── frontend/
 │   ├── screens/                  # (شاشات وصفحات النظام الرئيسية)
 │   ├── components/               # (المكونات المشتركة القابلة لإعادة الاستخدام)
@@ -48,19 +58,9 @@ Smart-Bone-Fracture-System/
 │   ├── package.json
 │   ├── vite.config.ts
 │   └── tsconfig.json
-├── backend/                      # (الواجهات الخلفية - جاهزة للبرمجة)
-│   ├── routes/
-│   ├── controllers/
-│   ├── models_db/
-│   └── uploads/
-├── ai_engine/                    # (محرك الذكاء الاصطناعي - جاهز للتدريب)
-│   ├── yolo_training/
-│   ├── grad_cam/
-│   ├── weights/
-│   └── inference.py
 ├── .gitignore
-├── README.md
-└── LICENSE
+├── LICENSE
+└── README.md
 ```
 
 ## Notes
