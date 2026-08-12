@@ -27,7 +27,7 @@ Open `http://localhost:3000` in your browser to see the app.
 - React & Vite
 - TailwindCSS for styling
 - Express (custom backend)
-- Gemini API (for the image analysis)
+- Custom AI Model for Bone Fracture Detection (Currently in training phase / not yet complete)
 
 ## Notes
 - The default login is bypassed in the UI for development, but you can configure actual authentication later.
