@@ -31,4 +31,4 @@ Open `http://localhost:3000` in your browser to see the app.
 
 ## Notes
 - The default login is bypassed in the UI for development, but you can configure actual authentication later.
-- Make sure your API key has access to `gemini-3.6-flash` (or update `server.ts` to use a different model).
+- **Temporary AI Model:** We are currently using the Gemini API (`gemini-3.6-flash`) as a placeholder while our custom bone fracture detection model finishes training. Ensure your API key has access to this version, or update `server.ts` to use an alternative model.
