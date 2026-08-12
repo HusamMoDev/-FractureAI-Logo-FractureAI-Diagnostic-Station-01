@@ -3,17 +3,17 @@ import { PageTab, ScanRecord } from './types';
 import { SAMPLE_SCANS } from './data/sampleScans';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
-import { DashboardView } from './components/DashboardView';
-import { DetectView } from './components/DetectView';
-import { ExplainView } from './components/ExplainView';
-import { DatabaseView } from './components/DatabaseView';
+import { DashboardView } from './screens/DashboardView';
+import { DetectView } from './screens/DetectView';
+import { ExplainView } from './screens/ExplainView';
+import { DatabaseView } from './screens/DatabaseView';
 import { UploadModal } from './components/UploadModal';
 import { ReportModal } from './components/ReportModal';
 import { SettingsModal } from './components/SettingsModal';
 import { ToolsOverlay } from './components/ToolsOverlay';
-import { ProfileView } from './components/ProfileView';
-import { AuthLayout } from './components/AuthLayout';
-import { SplashScreen } from './components/SplashScreen';
+import { ProfileView } from './screens/ProfileView';
+import { AuthLayout } from './screens/AuthLayout';
+import { SplashScreen } from './screens/SplashScreen';
 
 export function App() {
   const [showSplash, setShowSplash] = useState<boolean>(true);
