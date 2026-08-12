@@ -1,3 +1,9 @@
+ملاحظة: رخصة MIT هذه تنطبق حصرياً على الكود المصدري الموجود داخل مجلد frontend/. أما الأكواد والمنهجيات الموجودة في مجلد ai_model/ فهي محفوظة الحقوق بالكامل (All Rights Reserved) لأغراض البحث العلمي ولا تخضع لهذا الترخيص.
+
+NOTE: This MIT License applies exclusively to the source code located within the frontend/ folder. The code and methodologies located in the ai_model/ folder are completely reserved (All Rights Reserved) for scientific research purposes and are not subject to this license.
+
+--------------------------------------------------------------------------------
+
 MIT License
 
 Copyright (c) 2026 Husam Mohammed and Development Team
