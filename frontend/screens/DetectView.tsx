@@ -23,8 +23,7 @@ export const DetectView: React.FC<DetectViewProps> = ({
   const [viewSegment, setViewSegment] = useState<'bone' | 'soft' | 'metal'>('bone');
   const [showHeatmap, setShowHeatmap] = useState<boolean>(true);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
-  const [showSecondOpinionModal, setShowSecondOpinionModal] = useState<boolean>(false);
-  const [secondOpinionSuccess, setSecondOpinionSuccess] = useState<boolean>(false);
+
 
   // Filters based on segmented view
   const filterStyle =
@@ -338,94 +337,12 @@ export const DetectView: React.FC<DetectViewProps> = ({
               <span>Generate Medical Report</span>
             </button>
 
-            <button
-              onClick={() => setShowSecondOpinionModal(true)}
-              className="w-full bg-transparent border border-[#00B4DB]/50 text-[#4cd6fe] font-medium text-xs py-2 rounded-lg hover:bg-[#00B4DB]/10 active:scale-95 transition-all"
-            >
-              Request Second Opinion
-            </button>
+
           </div>
         </div>
       </div>
 
-      {/* Second Opinion Modal */}
-      {showSecondOpinionModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#12263A] border border-white/10 rounded-xl p-6 max-w-md w-full shadow-2xl">
-            <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-3">
-              <h3 className="text-base font-semibold text-white flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#00B4DB]">
-                  verified_user
-                </span>
-                <span>Request Senior Radiology Review</span>
-              </h3>
-              <button
-                onClick={() => {
-                  setShowSecondOpinionModal(false);
-                  setSecondOpinionSuccess(false);
-                }}
-                className="text-[#bcc8ce] hover:text-white"
-              >
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
 
-            {secondOpinionSuccess ? (
-              <div className="text-center py-6 space-y-3">
-                <div className="w-12 h-12 rounded-full bg-[#00B4DB]/20 text-[#00B4DB] mx-auto flex items-center justify-center">
-                  <span className="material-symbols-outlined text-2xl">check</span>
-                </div>
-                <h4 className="text-sm font-bold text-white">Review Requested</h4>
-                <p className="text-xs text-[#bcc8ce]">
-                  Case {scan.id} has been escalated to Chief Orthopedic Specialist Dr.
-                  S. Chen for secondary audit.
-                </p>
-                <button
-                  onClick={() => {
-                    setShowSecondOpinionModal(false);
-                    setSecondOpinionSuccess(false);
-                  }}
-                  className="btn-gradient px-4 py-2 rounded-lg text-xs font-semibold mt-2"
-                >
-                  Done
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <p className="text-xs text-[#bcc8ce]">
-                  Submit this study to the Senior Radiologist queue for secondary verification and AI alignment audit.
-                </p>
-
-                <div>
-                  <label className="block text-xs font-medium text-white mb-1">
-                    Clinical Review Reason
-                  </label>
-                  <textarea
-                    rows={3}
-                    placeholder="Enter notes or specific areas of concern..."
-                    className="w-full bg-[#0D1626] border border-white/10 rounded-lg p-2 text-xs text-white placeholder-[#bcc8ce]/50 focus:outline-none focus:border-[#00B4DB]"
-                  ></textarea>
-                </div>
-
-                <div className="flex justify-end gap-2 pt-2">
-                  <button
-                    onClick={() => setShowSecondOpinionModal(false)}
-                    className="px-3 py-1.5 text-xs text-[#bcc8ce] hover:text-white"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => setSecondOpinionSuccess(true)}
-                    className="btn-gradient px-4 py-1.5 rounded-lg text-xs font-semibold"
-                  >
-                    Confirm Request
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

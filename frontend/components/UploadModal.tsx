@@ -16,8 +16,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 }) => {
   const [patientName, setPatientName] = useState('Al-Hassan, Omar');
   const [patientAge, setPatientAge] = useState<string>('35');
-  const [modality] = useState<Modality>('X-Ray');
-  const [region, setRegion] = useState('Right Wrist');
+  const [modality, setModality] = useState<Modality>('X-Ray');
+  const [region, setRegion] = useState('');
   const [selectedPresetImage, setSelectedPresetImage] = useState<string | null>(null);
   const [uploadedBase64, setUploadedBase64] = useState<string | null>(null);
 
@@ -39,20 +39,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
   if (!isOpen) return null;
 
-  const samplePresets = [
-    {
-      title: 'Wrist Colles Fracture',
-      region: 'Right Wrist',
-      modality: 'X-Ray' as Modality,
-      url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBBqsiKgMivdu9rdC4-1A_DbnboSniZzPuRHcNiZGlbyyGv2H-_1O6mlwGiu48V2gbH9ZTjv7b73O4gJ-5MgOLPvF87VmMjzTuu-wFw0LEDclhCBo2lE9YO6blMnS63VJITH0gxXJUBWHJwBzA-C1pOY9u4wiUp-f2qcsECDhumMT-UvXo50CGU2RWu_MzYjeKLyXoTiZiie1Pugz38kZxwCWGzaEfRGB4yPdOPfETvaYRpnrzX24P3AnmpaQ5Xs-4iP20601oSMUwQ',
-    },
-    {
-      title: 'Forearm Transverse Fracture',
-      region: 'Left Forearm',
-      modality: 'X-Ray' as Modality,
-      url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDBnpGHUHKZVpWevgfrN1E8bHJIkD4J5-pkYDTDeNza2vVvz2tM-1wEp0YV6N7phwyauik3YCb3T_hMWJFz1Vk6kHoQ3pVTdM0rBgwtnLzOjNLScbj-vkXiPUkvJne7-4DfveyaqrepMPBcpIK0z_JC5SftXIkuvN1zH2A4MkfL649mr4LnFtrjw5YZ0gb5rQE6DKeTHsUifPPmGWPTr2lbMc-hlKE1bCTfHGrOLqimEW0QHNAV5DsIsVK807JL3IY4KmqYjqHUJpZm',
-    },
-  ];
+  const samplePresets: any[] = [];
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -87,7 +74,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     // POST /api/v1/analysis
     // await fetch('/api/v1/analysis', { method: 'POST', body: JSON.stringify(analysisPayload), ... })
 
-    const totalDuration = 4000; // 4 seconds total
+    const totalDuration = 3000; // 3 seconds total
     const intervalTime = 50; // Update frequently for smooth progress bar
     const totalSteps = totalDuration / intervalTime;
     let currentStep = 0;
@@ -95,7 +82,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     const timer = setInterval(() => {
       currentStep++;
       const progress = Math.min(100, Math.floor((currentStep / totalSteps) * 100));
-      
+
       setProcessingProgress(progress);
 
       if (progress < 25) {
@@ -111,7 +98,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       if (progress >= 100) {
         clearInterval(timer);
         setProcessingStep(4);
-        
+
         // Generate mock record for the rest of the application to function correctly
         const fallbackRecord: ScanRecord = {
           id: `PX-${Math.floor(1000 + Math.random() * 9000)}-FX`,
@@ -148,7 +135,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             label: 'Fracture (97.8%)',
           },
         };
-        
+
         setCompletedRecord(fallbackRecord);
         setUploadStatus('completed');
       }
@@ -186,35 +173,35 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               </div>
 
               <div className="w-full h-2 bg-[#0D1626] rounded-full overflow-hidden border border-white/10">
-                <div 
+                <div
                   className="h-full bg-gradient-to-r from-[#007c98] to-[#00B4DB] transition-all duration-75 ease-out"
                   style={{ width: `${processingProgress}%` }}
                 ></div>
               </div>
             </div>
-            
+
             <div className="space-y-3 mt-4 text-xs bg-[#0D1626]/50 p-4 rounded-xl border border-white/5">
               {steps.map((step, idx) => {
                 let isCompleted = idx <= processingStep;
                 let isActive = idx === processingStep + 1;
-                
+
                 if (processingStep === 4) {
-                   isCompleted = true;
-                   isActive = false;
+                  isCompleted = true;
+                  isActive = false;
                 }
 
                 return (
                   <div key={idx} className="flex items-center gap-3">
-                     {isCompleted ? (
-                       <span className="material-symbols-outlined text-[#00B4DB] text-[16px]">check_circle</span>
-                     ) : isActive ? (
-                       <span className="material-symbols-outlined text-[#4cd6fe] text-[16px] animate-spin">progress_activity</span>
-                     ) : (
-                       <span className="material-symbols-outlined text-[#bcc8ce]/30 text-[16px]">radio_button_unchecked</span>
-                     )}
-                     <span className={isCompleted ? 'text-[#bcc8ce]' : isActive ? 'text-white font-medium glow-text' : 'text-[#bcc8ce]/40'}>
-                       {step}
-                     </span>
+                    {isCompleted ? (
+                      <span className="material-symbols-outlined text-[#00B4DB] text-[16px]">check_circle</span>
+                    ) : isActive ? (
+                      <span className="material-symbols-outlined text-[#4cd6fe] text-[16px] animate-spin">progress_activity</span>
+                    ) : (
+                      <span className="material-symbols-outlined text-[#bcc8ce]/30 text-[16px]">radio_button_unchecked</span>
+                    )}
+                    <span className={isCompleted ? 'text-[#bcc8ce]' : isActive ? 'text-white font-medium glow-text' : 'text-[#bcc8ce]/40'}>
+                      {step}
+                    </span>
                   </div>
                 );
               })}
@@ -230,7 +217,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           <div className="w-20 h-20 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.2)]">
             <span className="material-symbols-outlined text-5xl text-emerald-400">check_circle</span>
           </div>
-          
+
           <div>
             <h3 className="text-xl font-bold text-white mb-2">Analysis Complete</h3>
             <p className="text-sm text-[#bcc8ce]">
@@ -262,7 +249,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center border border-red-500/30">
             <span className="material-symbols-outlined text-5xl text-red-400">error</span>
           </div>
-          
+
           <div>
             <h3 className="text-xl font-bold text-white mb-2">Analysis Failed</h3>
             <p className="text-sm text-[#bcc8ce]">
@@ -285,7 +272,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
     // Default 'idle' form view
     const isAgeValid = patientAge.trim() !== '' && Number(patientAge) >= 0 && Number(patientAge) <= 120;
-    const isFormValid = patientName.trim() !== '' && isAgeValid && (uploadedBase64 || selectedPresetImage);
+    const isFormValid = patientName.trim() !== '' && isAgeValid && modality.trim() !== '' && region.trim() !== '' && (uploadedBase64 || selectedPresetImage);
 
     return (
       <div className="space-y-4 text-xs text-[#dae4eb]">
@@ -313,13 +300,12 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               max="120"
               value={patientAge}
               onChange={(e) => setPatientAge(e.target.value)}
-              className={`w-full bg-[#0D1626] border ${
-                patientAge.trim() !== '' && !isAgeValid
-                  ? 'border-red-500 focus:border-red-500'
-                  : !patientAge.trim() 
+              className={`w-full bg-[#0D1626] border ${patientAge.trim() !== '' && !isAgeValid
+                ? 'border-red-500 focus:border-red-500'
+                : !patientAge.trim()
                   ? 'border-red-500/50 focus:border-red-500/50'
                   : 'border-white/10 focus:border-[#00B4DB]'
-              } rounded-lg p-2 text-white focus:outline-none`}
+                } rounded-lg p-2 text-white focus:outline-none`}
               placeholder="e.g. 25"
             />
             {patientAge.trim() !== '' && !isAgeValid && (
@@ -331,12 +317,33 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           </div>
         </div>
 
-        <div>
-          <label className="block text-[10px] font-semibold text-[#bcc8ce] uppercase mb-1">
-            Modality
-          </label>
-          <div className="w-full bg-[#0D1626] border border-white/10 rounded-lg p-2 text-white/70 cursor-not-allowed">
-            {modality}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[10px] font-semibold text-[#bcc8ce] uppercase mb-1">
+              Modality <span className="text-red-400">*</span>
+            </label>
+            <select
+              value={modality}
+              onChange={(e) => setModality(e.target.value as Modality)}
+              className="w-full bg-[#0D1626] border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-[#00B4DB] appearance-none"
+            >
+              <option value="X-Ray">X-Ray</option>
+              <option value="CT Scan">CT Scan</option>
+              <option value="MRI">MRI</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-semibold text-[#bcc8ce] uppercase mb-1">
+              Region <span className="text-red-400">*</span>
+            </label>
+            <input
+              type="text"
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+              className={`w-full bg-[#0D1626] border ${!region.trim() ? 'border-red-500/50' : 'border-white/10'} rounded-lg p-2 text-white focus:outline-none focus:border-[#00B4DB]`}
+              placeholder="e.g. Left Femur"
+            />
           </div>
         </div>
 
@@ -348,9 +355,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
           {(uploadedBase64 || selectedPresetImage) ? (
             <div className="relative border border-[#00B4DB]/30 rounded-xl overflow-hidden bg-[#0D1626] flex items-center p-3 gap-4 shadow-[0_0_15px_rgba(0,180,219,0.1)]">
-              <img 
-                src={(uploadedBase64 || selectedPresetImage) as string} 
-                alt="Selected X-Ray" 
+              <img
+                src={(uploadedBase64 || selectedPresetImage) as string}
+                alt="Selected X-Ray"
                 className="w-16 h-16 object-cover rounded-lg border border-white/10"
               />
               <div className="flex-1 min-w-0">
