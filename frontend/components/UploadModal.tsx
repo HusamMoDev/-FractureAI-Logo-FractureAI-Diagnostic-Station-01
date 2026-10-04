@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScanRecord, Modality } from '../types';
+import { supabase } from '../lib/supabase';
+import { runInference } from '../services/inference';
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -14,12 +16,14 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   onClose,
   onScanCreated,
 }) => {
-  const [patientName, setPatientName] = useState('Al-Hassan, Omar');
-  const [patientAge, setPatientAge] = useState<string>('35');
-  const [modality, setModality] = useState<Modality>('X-Ray');
+  const [patientName, setPatientName] = useState('');
+  const [patientAge, setPatientAge] = useState<string>('');
+  const [patientSex, setPatientSex] = useState<string>('');
+  const [modality, setModality] = useState<Modality | ''>('');
   const [region, setRegion] = useState('');
-  const [selectedPresetImage, setSelectedPresetImage] = useState<string | null>(null);
+
   const [uploadedBase64, setUploadedBase64] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>('idle');
   const [analysisError, setAnalysisError] = useState<string | null>(null);
@@ -29,6 +33,14 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      setPatientName('');
+      setPatientAge('');
+      setPatientSex('');
+      setModality('');
+      setRegion('');
+       setUploadedBase64(null);
+      setSelectedFile(null);
+
       setUploadStatus('idle');
       setProcessingProgress(0);
       setProcessingStep(0);
@@ -39,127 +51,437 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
   if (!isOpen) return null;
 
-  const samplePresets: any[] = [];
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = e.target.files?.[0];
-    if (file) {
+
+    if (!file) return;
+
+    setSelectedFile(file);
+    setUploadedBase64(null);
+
+    const isImagePreviewable =
+      file.type === 'image/png' ||
+      file.type === 'image/jpeg' ||
+      file.type === 'image/webp';
+
+    if (isImagePreviewable) {
       const reader = new FileReader();
+
       reader.onload = () => {
         setUploadedBase64(reader.result as string);
       };
+
       reader.readAsDataURL(file);
+    } else {
+      setUploadedBase64(null);
     }
   };
 
-  const simulateAnalysis = () => {
+  const calculateSha256 = async (file: File): Promise<string> => {
+    const buffer = await file.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+
+    return hashArray
+      .map((byte) => byte.toString(16).padStart(2, '0'))
+      .join('');
+  };
+
+  const generateMrn = () => {
+    const randomPart = Math.floor(
+      100000 + Math.random() * 900000,
+    );
+
+    return `MRN-${randomPart}`;
+  };
+
+  const generateStoragePath = (
+    userId: string,
+    caseId: string,
+    fileName: string,
+  ) => {
+    const safeFileName = fileName
+      .replace(/[^a-zA-Z0-9._-]/g, '_')
+      .replace(/_+/g, '_');
+
+    return `${userId}/${caseId}/${Date.now()}-${safeFileName}`;
+  };
+
+  const createPendingScanRecord = (
+  caseId: string,
+  mrn: string,
+  imageUrl: string,
+): ScanRecord => {
+  return {
+    id: caseId,
+    patientName,
+    patientAge: Number(patientAge),
+    dob: '',
+    mrn,
+    gender: patientSex,
+    date: new Date().toISOString().split('T')[0],
+    time: new Date().toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    }),
+    modality: modality as Modality,
+    region,
+    status: 'Pending',
+    confidence: null,
+    imageUrl,
+    primaryFinding: 'Analysis pending',
+    secondaryFinding: '',
+    secondaryConfidence: 0,
+    recommendation: 'AI analysis is pending.',
+    indication: '',
+    technique: `${modality} acquisition.`,
+    findingsList: [],
+    impression: 'AI analysis is pending.',
+    radiologist: '',
+    obbBox: undefined,
+  };
+};
+
+  const simulateProgress = (
+    progress: number,
+    step: number,
+  ) => {
+    setProcessingProgress(progress);
+    setProcessingStep(step);
+  };
+
+  const handleAnalyze = async () => {
+    if (!selectedFile) {
+      setAnalysisError('Please select an X-Ray image.');
+      setUploadStatus('error');
+      return;
+    }
+
+    if (!patientName.trim()) {
+      setAnalysisError('Patient Name is required.');
+      setUploadStatus('error');
+      return;
+    }
+
+    if (patientAge.trim() === '' || Number(patientAge) < 0 || Number(patientAge) > 120) {
+      setAnalysisError('Patient Age must be between 0 and 120.');
+      setUploadStatus('error');
+      return;
+    }
+
+    if (!patientSex) {
+      setAnalysisError('Sex is required.');
+      setUploadStatus('error');
+      return;
+    }
+
+    if (!region.trim()) {
+      setAnalysisError('Region is required.');
+      setUploadStatus('error');
+      return;
+    }
+
     setUploadStatus('processing');
     setAnalysisError(null);
     setProcessingProgress(0);
     setProcessingStep(0);
 
-    const activeImageUrl = uploadedBase64 || selectedPresetImage;
+    try {
+      // ---------------------------------------------------------
+      // 1. Get authenticated user
+      // ---------------------------------------------------------
+      simulateProgress(10, 0);
 
-    // Data payload for future Backend API
-    const analysisPayload = {
-      patientName,
-      patientAge: Number(patientAge),
-      modality,
-      xrayImage: activeImageUrl
-    };
-    console.log("Simulating API request with payload:", analysisPayload);
+      const {
+        data: {
+          user,
+        },
+        error: userError,
+      } = await supabase.auth.getUser();
 
-    // TODO: Replace simulated analysis with real AI inference API.
-    // Example:
-    // POST /api/v1/analysis
-    // await fetch('/api/v1/analysis', { method: 'POST', body: JSON.stringify(analysisPayload), ... })
-
-    const totalDuration = 3000; // 3 seconds total
-    const intervalTime = 50; // Update frequently for smooth progress bar
-    const totalSteps = totalDuration / intervalTime;
-    let currentStep = 0;
-
-    const timer = setInterval(() => {
-      currentStep++;
-      const progress = Math.min(100, Math.floor((currentStep / totalSteps) * 100));
-
-      setProcessingProgress(progress);
-
-      if (progress < 25) {
-        setProcessingStep(0);
-      } else if (progress < 50) {
-        setProcessingStep(1);
-      } else if (progress < 75) {
-        setProcessingStep(2);
-      } else if (progress < 100) {
-        setProcessingStep(3);
+      if (userError) {
+        throw userError;
       }
 
-      if (progress >= 100) {
-        clearInterval(timer);
-        setProcessingStep(4);
-
-        // Generate mock record for the rest of the application to function correctly
-        const fallbackRecord: ScanRecord = {
-          id: `PX-${Math.floor(1000 + Math.random() * 9000)}-FX`,
-          patientName,
-          patientAge: Number(patientAge),
-          dob: '1987-06-15',
-          mrn: `MRN-${Math.floor(10000 + Math.random() * 90000)}`,
-          gender: 'Male',
-          date: new Date().toISOString().split('T')[0],
-          time: 'Now',
-          modality,
-          region,
-          status: 'Critical',
-          confidence: 97.8,
-          imageUrl: activeImageUrl,
-          primaryFinding: 'Acute Cortical Fracture',
-          secondaryFinding: 'Soft Tissue Swelling',
-          secondaryConfidence: 85.0,
-          recommendation: 'Immediate orthopedic consultation and splinting recommended.',
-          indication: 'Acute localized pain and deformity post-fall.',
-          technique: `${modality} 2-view standard acquisition.`,
-          findingsList: [
-            'Cortical disruption with minor angulation.',
-            'No displaced intra-articular extension appreciated.',
-            'Associated soft tissue edema.'
-          ],
-          impression: '1. Acute cortical fracture.\n2. Moderate soft tissue edema.',
-          radiologist: 'Dr. S. Chen',
-          obbBox: {
-            top: '35%',
-            left: '40%',
-            width: '22%',
-            height: '25%',
-            label: 'Fracture (97.8%)',
-          },
-        };
-
-        setCompletedRecord(fallbackRecord);
-        setUploadStatus('completed');
+      if (!user) {
+        throw new Error(
+          'No authenticated user. Please sign in again.',
+        );
       }
-    }, intervalTime);
+
+      // ---------------------------------------------------------
+      // 2. Get user's clinic
+      // ---------------------------------------------------------
+      simulateProgress(15, 0);
+
+      const {
+        data: profile,
+        error: profileError,
+      } = await supabase
+        .from('profiles')
+        .select('id_clinic')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError) {
+        throw new Error(
+          `Could not load user profile: ${profileError.message}`,
+        );
+      }
+
+      if (!profile?.id_clinic) {
+        throw new Error(
+          'Your account is not linked to a clinic.',
+        );
+      }
+
+      // ---------------------------------------------------------
+      // 3. Find existing patient or create a new patient
+      //
+      // Patient identity is now handled by the database RPC.
+      // The upload form does NOT collect DOB and does not use a fake/default age.
+      // The RPC reuses an existing patient in the same clinic when
+      // normalized name + sex match; otherwise it creates a patient
+      // with a unique MRN.
+      // ---------------------------------------------------------
+      simulateProgress(25, 1);
+
+      const {
+        data: patient,
+        error: patientError,
+      } = await supabase.rpc('patient_find_or_create', {
+        p_name_full: patientName.trim(),
+        p_age: Number(patientAge),
+        p_sex: patientSex,
+      });
+
+      if (patientError || !patient) {
+        throw new Error(
+          `Could not find or create patient: ${
+            patientError?.message || 'Unknown error'
+          }`,
+        );
+      }
+
+      const mrn = patient.number_record_medical as string;
+
+      // ---------------------------------------------------------
+      // 4. Create Case using case_create RPC
+      //
+      // case_create arguments:
+      // p_id_patient uuid
+      // p_part_body text
+      // p_priority text
+      // p_summary text
+      // ---------------------------------------------------------
+      simulateProgress(40, 1);
+
+     const { data: caseId, error: caseError } = await supabase.rpc('case_create', {
+  id_patient_p: patient.id,
+  part_body_p: region.trim(),
+  priority_p: 'normal',
+  summary_p: `X-Ray examination for ${patientName.trim()}.`,
+});
+
+      if (caseError || !caseId) {
+        throw new Error(
+          `Could not create case: ${
+            caseError?.message || 'No case ID returned.'
+          }`,
+        );
+      }
+
+      // ---------------------------------------------------------
+      // 5. Calculate file hash
+      // ---------------------------------------------------------
+      simulateProgress(50, 1);
+
+      const sha256 = await calculateSha256(selectedFile);
+
+      // ---------------------------------------------------------
+      // 6. Upload actual X-Ray to Supabase Storage
+      // ---------------------------------------------------------
+      simulateProgress(60, 2);
+
+      const bucketName = 'images-xray';
+
+      const storagePath = generateStoragePath(
+        user.id,
+        caseId,
+        selectedFile.name,
+      );
+
+      const {
+        error: storageError,
+      } = await supabase.storage
+        .from(bucketName)
+        .upload(storagePath, selectedFile, {
+          contentType:
+            selectedFile.type || 'application/octet-stream',
+          upsert: false,
+        });
+
+      if (storageError) {
+        throw new Error(
+          `X-Ray upload failed: ${storageError.message}`,
+        );
+      }
+
+      // ---------------------------------------------------------
+      // 7. Create images_xray metadata record
+      // ---------------------------------------------------------
+      simulateProgress(72, 2);
+
+      const {
+        data: imageRecord,
+        error: imageRecordError,
+      } = await supabase
+        .from('images_xray')
+        .insert({
+          by_uploaded: user.id,
+          id_case: caseId,
+          bucket_storage: bucketName,
+          path_storage: storagePath,
+          filename_original: selectedFile.name,
+          type_mime:
+            selectedFile.type || 'application/octet-stream',
+          bytes_size_file: selectedFile.size,
+          sha256,
+          status_inference: 'queued',
+        })
+        .select(
+          `
+          id,
+          id_case,
+          filename_original,
+          type_mime,
+          bytes_size_file,
+          status_inference
+          `,
+        )
+        .single();
+
+      if (imageRecordError || !imageRecord) {
+        // If database metadata creation fails after Storage upload,
+        // remove the uploaded object so we do not leave an orphan file.
+        await supabase.storage
+          .from(bucketName)
+          .remove([storagePath]);
+
+        throw new Error(
+          `Could not create X-Ray metadata: ${
+            imageRecordError?.message || 'Unknown error'
+          }`,
+        );
+      }
+
+      // ---------------------------------------------------------
+      // 8. Run inference validation / AI pipeline
+      // ---------------------------------------------------------
+      simulateProgress(82, 3);
+
+      const inferenceResult = await runInference(
+        imageRecord.id,
+      );
+
+      // ---------------------------------------------------------
+      // 9. Create signed URL for immediate UI display
+      // ---------------------------------------------------------
+      simulateProgress(92, 4);
+
+      let imageUrl = uploadedBase64 || '';
+
+      const {
+        data: signedUrlData,
+        error: signedUrlError,
+      } = await supabase.storage
+        .from(bucketName)
+        .createSignedUrl(storagePath, 60 * 60);
+
+      if (signedUrlError) {
+        console.warn(
+          'Could not create signed URL:',
+          signedUrlError,
+        );
+      } else if (signedUrlData?.signedUrl) {
+        imageUrl = signedUrlData.signedUrl;
+      }
+
+      // ---------------------------------------------------------
+      // 10. Create UI record
+      //
+      // IMPORTANT:
+      // No fake AI result is created here.
+      // ---------------------------------------------------------
+      simulateProgress(100, 4);
+
+      const pendingRecord = createPendingScanRecord(
+        caseId,
+        mrn,
+        imageUrl,
+      );
+
+      setCompletedRecord(pendingRecord);
+
+      console.log(
+        'Real upload/inference validation completed:',
+        {
+          patientId: patient.id,
+          caseId,
+          imageId: imageRecord.id,
+          inference: inferenceResult,
+        },
+      );
+
+      setUploadStatus('completed');
+    } catch (error) {
+      console.error(
+        'Real X-Ray upload/inference workflow failed:',
+        error,
+      );
+
+      setAnalysisError(
+        error instanceof Error
+          ? error.message
+          : 'Something went wrong while processing the X-Ray.',
+      );
+
+      setUploadStatus('error');
+    }
   };
 
   const renderContent = () => {
-    const activeImageUrl = uploadedBase64 || selectedPresetImage;
+    const activeImageUrl = uploadedBase64;
 
     if (uploadStatus === 'processing') {
       const steps = [
-        'Image uploaded',
-        'Preparing image...',
-        'AI model analyzing...',
-        'Detecting abnormalities...',
-        'Finalizing analysis...'
+        'Patient and case prepared',
+        'Preparing X-Ray...',
+        'Uploading X-Ray...',
+        'Sending to AI service...',
+        'Finalizing...',
       ];
 
       return (
         <div className="py-8 flex flex-col items-center justify-center space-y-8 px-4">
           <div className="relative w-56 h-56 rounded-xl overflow-hidden border border-[#00B4DB]/30 shadow-[0_0_15px_rgba(0,180,219,0.15)] bg-black/50">
-            <img src={activeImageUrl} alt="Processing" className="w-full h-full object-contain grayscale opacity-60" />
+            {activeImageUrl ? (
+              <img
+                src={activeImageUrl}
+                alt="Processing"
+                className="w-full h-full object-contain grayscale opacity-60"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-[#bcc8ce]">
+                X-Ray
+              </div>
+            )}
+
             <div className="absolute inset-0 bg-[#00B4DB]/10"></div>
-            {/* Scanning Line Animation */}
+
             <div className="absolute top-0 left-0 w-full h-1 bg-[#4cd6fe] shadow-[0_0_12px_3px_#4cd6fe] animate-scan-line"></div>
           </div>
 
@@ -167,39 +489,62 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             <div>
               <div className="flex justify-between items-end mb-2">
                 <h4 className="text-sm font-bold text-[#4cd6fe]">
-                  {steps[Math.min(processingStep + 1, 4)]}
+                  {steps[Math.min(processingStep, 4)]}
                 </h4>
-                <span className="text-xs font-mono text-[#bcc8ce]">{processingProgress}%</span>
+
+                <span className="text-xs font-mono text-[#bcc8ce]">
+                  {processingProgress}%
+                </span>
               </div>
 
               <div className="w-full h-2 bg-[#0D1626] rounded-full overflow-hidden border border-white/10">
                 <div
                   className="h-full bg-gradient-to-r from-[#007c98] to-[#00B4DB] transition-all duration-75 ease-out"
-                  style={{ width: `${processingProgress}%` }}
+                  style={{
+                    width: `${processingProgress}%`,
+                  }}
                 ></div>
               </div>
             </div>
 
             <div className="space-y-3 mt-4 text-xs bg-[#0D1626]/50 p-4 rounded-xl border border-white/5">
               {steps.map((step, idx) => {
-                let isCompleted = idx <= processingStep;
-                let isActive = idx === processingStep + 1;
+                const isCompleted =
+                  idx < processingStep ||
+                  (processingStep === 4 && idx === 4);
 
-                if (processingStep === 4) {
-                  isCompleted = true;
-                  isActive = false;
-                }
+                const isActive =
+                  idx === processingStep &&
+                  processingStep < 5;
 
                 return (
-                  <div key={idx} className="flex items-center gap-3">
+                  <div
+                    key={idx}
+                    className="flex items-center gap-3"
+                  >
                     {isCompleted ? (
-                      <span className="material-symbols-outlined text-[#00B4DB] text-[16px]">check_circle</span>
+                      <span className="material-symbols-outlined text-[#00B4DB] text-[16px]">
+                        check_circle
+                      </span>
                     ) : isActive ? (
-                      <span className="material-symbols-outlined text-[#4cd6fe] text-[16px] animate-spin">progress_activity</span>
+                      <span className="material-symbols-outlined text-[#4cd6fe] text-[16px] animate-spin">
+                        progress_activity
+                      </span>
                     ) : (
-                      <span className="material-symbols-outlined text-[#bcc8ce]/30 text-[16px]">radio_button_unchecked</span>
+                      <span className="material-symbols-outlined text-[#bcc8ce]/30 text-[16px]">
+                        radio_button_unchecked
+                      </span>
                     )}
-                    <span className={isCompleted ? 'text-[#bcc8ce]' : isActive ? 'text-white font-medium glow-text' : 'text-[#bcc8ce]/40'}>
+
+                    <span
+                      className={
+                        isCompleted
+                          ? 'text-[#bcc8ce]'
+                          : isActive
+                            ? 'text-white font-medium glow-text'
+                            : 'text-[#bcc8ce]/40'
+                      }
+                    >
                       {step}
                     </span>
                   </div>
@@ -215,13 +560,19 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       return (
         <div className="py-12 flex flex-col items-center justify-center space-y-6 text-center animate-in fade-in zoom-in duration-300">
           <div className="w-20 h-20 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.2)]">
-            <span className="material-symbols-outlined text-5xl text-emerald-400">check_circle</span>
+            <span className="material-symbols-outlined text-5xl text-emerald-400">
+              check_circle
+            </span>
           </div>
 
           <div>
-            <h3 className="text-xl font-bold text-white mb-2">Analysis Complete</h3>
+            <h3 className="text-xl font-bold text-white mb-2">
+              Upload Complete
+            </h3>
+
             <p className="text-sm text-[#bcc8ce]">
-              The X-Ray image has been processed successfully.
+              The X-Ray image was uploaded successfully and is
+              waiting for AI analysis.
             </p>
           </div>
 
@@ -236,7 +587,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               className="btn-gradient px-8 py-3 rounded-xl font-bold text-sm shadow-lg flex items-center gap-2 hover:scale-105 transition-transform"
             >
               <span>View Results</span>
-              <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+
+              <span className="material-symbols-outlined text-[18px]">
+                arrow_forward
+              </span>
             </button>
           </div>
         </div>
@@ -247,22 +601,34 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       return (
         <div className="py-12 flex flex-col items-center justify-center space-y-6 text-center animate-in fade-in zoom-in duration-300">
           <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center border border-red-500/30">
-            <span className="material-symbols-outlined text-5xl text-red-400">error</span>
+            <span className="material-symbols-outlined text-5xl text-red-400">
+              error
+            </span>
           </div>
 
           <div>
-            <h3 className="text-xl font-bold text-white mb-2">Analysis Failed</h3>
+            <h3 className="text-xl font-bold text-white mb-2">
+              Upload Failed
+            </h3>
+
             <p className="text-sm text-[#bcc8ce]">
-              {analysisError || 'Something went wrong while processing the image.'}
+              {analysisError ||
+                'Something went wrong while processing the image.'}
             </p>
           </div>
 
           <div className="pt-4">
             <button
-              onClick={() => setUploadStatus('idle')}
+              onClick={() => {
+                setUploadStatus('idle');
+                setAnalysisError(null);
+              }}
               className="px-6 py-2.5 rounded-lg font-bold text-sm bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-colors flex items-center gap-2"
             >
-              <span className="material-symbols-outlined text-[18px]">refresh</span>
+              <span className="material-symbols-outlined text-[18px]">
+                refresh
+              </span>
+
               <span>Try Again</span>
             </button>
           </div>
@@ -270,9 +636,18 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       );
     }
 
-    // Default 'idle' form view
-    const isAgeValid = patientAge.trim() !== '' && Number(patientAge) >= 0 && Number(patientAge) <= 120;
-    const isFormValid = patientName.trim() !== '' && isAgeValid && modality.trim() !== '' && region.trim() !== '' && (uploadedBase64 || selectedPresetImage);
+    const isAgeValid =
+      patientAge.trim() !== '' &&
+      Number(patientAge) >= 0 &&
+      Number(patientAge) <= 120;
+
+    const isFormValid =
+      patientName.trim() !== '' &&
+      isAgeValid &&
+      patientSex !== '' &&
+      modality.trim() !== '' &&
+      region.trim() !== '' &&
+      !!selectedFile;
 
     return (
       <div className="space-y-4 text-xs text-[#dae4eb]">
@@ -281,38 +656,57 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             <label className="block text-[10px] font-semibold text-[#bcc8ce] uppercase mb-1">
               Patient Name <span className="text-red-400">*</span>
             </label>
+
             <input
               type="text"
               value={patientName}
               onChange={(e) => setPatientName(e.target.value)}
-              className={`w-full bg-[#0D1626] border ${!patientName.trim() ? 'border-red-500/50' : 'border-white/10'} rounded-lg p-2 text-white focus:outline-none focus:border-[#00B4DB]`}
-              placeholder="e.g. Hussam Mohamed"
+              className={`w-full bg-[#0D1626] border ${
+                !patientName.trim()
+                  ? 'border-red-500/50'
+                  : 'border-white/10'
+              } rounded-lg p-2 text-white focus:outline-none focus:border-[#00B4DB]`}
+              placeholder="Patient name"
             />
+
+            {!patientName.trim() && (
+              <p className="text-[10px] text-red-400 mt-1">
+                Patient Name is required.
+              </p>
+            )}
           </div>
 
           <div>
             <label className="block text-[10px] font-semibold text-[#bcc8ce] uppercase mb-1">
               Patient Age <span className="text-red-400">*</span>
             </label>
+
             <input
               type="number"
               min="0"
               max="120"
               value={patientAge}
               onChange={(e) => setPatientAge(e.target.value)}
-              className={`w-full bg-[#0D1626] border ${patientAge.trim() !== '' && !isAgeValid
-                ? 'border-red-500 focus:border-red-500'
-                : !patientAge.trim()
-                  ? 'border-red-500/50 focus:border-red-500/50'
-                  : 'border-white/10 focus:border-[#00B4DB]'
-                } rounded-lg p-2 text-white focus:outline-none`}
+              className={`w-full bg-[#0D1626] border ${
+                patientAge.trim() !== '' && !isAgeValid
+                  ? 'border-red-500 focus:border-red-500'
+                  : !patientAge.trim()
+                    ? 'border-red-500/50 focus:border-red-500/50'
+                    : 'border-white/10 focus:border-[#00B4DB]'
+              } rounded-lg p-2 text-white focus:outline-none`}
               placeholder="e.g. 25"
             />
+
             {patientAge.trim() !== '' && !isAgeValid && (
-              <p className="text-[10px] text-red-400 mt-1">Age must be between 0 and 120.</p>
+              <p className="text-[10px] text-red-400 mt-1">
+                Age must be between 0 and 120.
+              </p>
             )}
+
             {patientAge.trim() === '' && (
-              <p className="text-[10px] text-red-400 mt-1">Patient Age is required.</p>
+              <p className="text-[10px] text-red-400 mt-1">
+                Patient Age is required.
+              </p>
             )}
           </div>
         </div>
@@ -320,96 +714,160 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-[10px] font-semibold text-[#bcc8ce] uppercase mb-1">
+              Sex <span className="text-red-400">*</span>
+            </label>
+
+            <select
+              value={patientSex}
+              onChange={(e) => setPatientSex(e.target.value)}
+              className={`w-full bg-[#0D1626] border ${
+                !patientSex
+                  ? 'border-red-500/50'
+                  : 'border-white/10'
+              } rounded-lg p-2 text-white focus:outline-none focus:border-[#00B4DB] appearance-none`}
+            >
+              <option value="">Select sex</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+
+            {!patientSex && (
+              <p className="text-[10px] text-red-400 mt-1">
+                Sex is required.
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-semibold text-[#bcc8ce] uppercase mb-1">
               Modality <span className="text-red-400">*</span>
             </label>
+
             <select
               value={modality}
-              onChange={(e) => setModality(e.target.value as Modality)}
+              onChange={(e) => setModality(e.target.value as Modality | '')}
               className="w-full bg-[#0D1626] border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-[#00B4DB] appearance-none"
             >
+              <option value="">Select modality</option>
               <option value="X-Ray">X-Ray</option>
-              <option value="CT Scan">CT Scan</option>
+              <option value="CT">CT</option>
+              <option value="MRI">MRI</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-[10px] font-semibold text-[#bcc8ce] uppercase mb-1">
+            Region <span className="text-red-400">*</span>
+          </label>
+
+          <input
+            type="text"
+            value={region}
+            onChange={(e) => setRegion(e.target.value)}
+            className={`w-full bg-[#0D1626] border ${
+              !region.trim()
+                ? 'border-red-500/50'
+                : 'border-white/10'
+            } rounded-lg p-2 text-white focus:outline-none focus:border-[#00B4DB]`}
+            placeholder="e.g. Left Femur"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[10px] font-semibold text-[#bcc8ce] uppercase mb-1">
+              Modality{' '}
+              <span className="text-red-400">*</span>
+            </label>
+
+            <select
+              value={modality}
+              onChange={(e) =>
+                setModality(e.target.value as Modality | '')
+              }
+              className="w-full bg-[#0D1626] border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-[#00B4DB] appearance-none"
+            >
+              <option value="">Select modality</option>
+              <option value="X-Ray">X-Ray</option>
+              <option value="CT">CT</option>
               <option value="MRI">MRI</option>
             </select>
           </div>
 
           <div>
             <label className="block text-[10px] font-semibold text-[#bcc8ce] uppercase mb-1">
-              Region <span className="text-red-400">*</span>
+              Region{' '}
+              <span className="text-red-400">*</span>
             </label>
+
             <input
               type="text"
               value={region}
-              onChange={(e) => setRegion(e.target.value)}
-              className={`w-full bg-[#0D1626] border ${!region.trim() ? 'border-red-500/50' : 'border-white/10'} rounded-lg p-2 text-white focus:outline-none focus:border-[#00B4DB]`}
+              onChange={(e) =>
+                setRegion(e.target.value)
+              }
+              className={`w-full bg-[#0D1626] border ${
+                !region.trim()
+                  ? 'border-red-500/50'
+                  : 'border-white/10'
+              } rounded-lg p-2 text-white focus:outline-none focus:border-[#00B4DB]`}
               placeholder="e.g. Left Femur"
             />
           </div>
         </div>
 
-        {/* Image Selection Tabs */}
         <div>
           <label className="block text-[10px] font-semibold text-[#bcc8ce] uppercase mb-1.5">
             Select X-Ray Image
           </label>
 
-          {(uploadedBase64 || selectedPresetImage) ? (
+          {(uploadedBase64 || selectedFile) ? (
             <div className="relative border border-[#00B4DB]/30 rounded-xl overflow-hidden bg-[#0D1626] flex items-center p-3 gap-4 shadow-[0_0_15px_rgba(0,180,219,0.1)]">
-              <img
-                src={(uploadedBase64 || selectedPresetImage) as string}
-                alt="Selected X-Ray"
-                className="w-16 h-16 object-cover rounded-lg border border-white/10"
-              />
+              {uploadedBase64 ? (
+                <img
+                  src={uploadedBase64}
+                  alt="Selected X-Ray"
+                  className="w-16 h-16 object-cover rounded-lg border border-white/10"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-lg border border-white/10 flex items-center justify-center text-[#00B4DB]">
+                  <span className="material-symbols-outlined">
+                    radiology
+                  </span>
+                </div>
+              )}
+
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-white truncate text-sm">
-                  {uploadedBase64 ? 'custom-scan.png' : 'preset-scan.jpg'}
+                  {selectedFile?.name || 'Selected X-Ray'}
                 </p>
+
                 <p className="text-xs text-[#00B4DB] font-medium flex items-center gap-1 mt-0.5">
-                  <span className="material-symbols-outlined text-[14px]">radiology</span>
+                  <span className="material-symbols-outlined text-[14px]">
+                    radiology
+                  </span>
+
                   X-Ray Format
                 </p>
               </div>
+
               <button
                 onClick={() => {
                   setUploadedBase64(null);
-                  setSelectedPresetImage(null);
+                             setSelectedFile(null);
                 }}
                 className="w-8 h-8 flex items-center justify-center rounded-full bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
                 title="Remove Image"
               >
-                <span className="material-symbols-outlined text-[18px]">delete</span>
+                <span className="material-symbols-outlined text-[18px]">
+                  delete
+                </span>
               </button>
             </div>
           ) : (
             <>
-              {/* Sample Presets */}
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                {samplePresets.map((preset) => (
-                  <div
-                    key={preset.title}
-                    onClick={() => {
-                      setSelectedPresetImage(preset.url);
-                      setRegion(preset.region);
-                      setUploadedBase64(null);
-                    }}
-                    className="p-2 rounded-lg border cursor-pointer flex items-center gap-2 transition-all border-white/10 hover:border-[#00B4DB]/50 bg-[#0D1626] group"
-                  >
-                    <img
-                      src={preset.url}
-                      alt={preset.title}
-                      className="w-10 h-10 object-cover rounded grayscale group-hover:grayscale-0 transition-all"
-                    />
-                    <div className="min-w-0">
-                      <p className="font-semibold text-white truncate text-[11px] group-hover:text-[#4cd6fe]">
-                        {preset.title}
-                      </p>
-                      <p className="text-[10px] text-[#bcc8ce]">{preset.region}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Drag & Drop File Input */}
               <div className="border-2 border-dashed border-white/20 rounded-xl p-4 text-center hover:border-[#00B4DB]/60 transition-colors bg-[#0D1626]/50">
                 <input
                   type="file"
@@ -418,6 +876,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                   className="hidden"
                   id="scan-file-input"
                 />
+
                 <label
                   htmlFor="scan-file-input"
                   className="cursor-pointer flex flex-col items-center gap-1.5"
@@ -425,9 +884,11 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                   <span className="material-symbols-outlined text-2xl text-[#00B4DB]">
                     cloud_upload
                   </span>
+
                   <span className="font-medium text-white">
                     Click to Upload Custom X-Ray
                   </span>
+
                   <span className="text-[10px] text-[#bcc8ce]">
                     Supports PNG, JPG, JPEG, WebP, or DICOM exports
                   </span>
@@ -444,8 +905,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           >
             Cancel
           </button>
+
           <button
-            onClick={simulateAnalysis}
+            onClick={handleAnalyze}
             disabled={!isFormValid}
             className="btn-gradient px-5 py-2 rounded-lg font-bold text-xs shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -462,15 +924,30 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         <div className="flex justify-between items-center border-b border-white/10 pb-3">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-[#00B4DB]">
-              {uploadStatus === 'processing' ? 'memory' : uploadStatus === 'completed' ? 'verified' : 'upload_file'}
+              {uploadStatus === 'processing'
+                ? 'memory'
+                : uploadStatus === 'completed'
+                  ? 'verified'
+                  : 'upload_file'}
             </span>
+
             <h3 className="text-base font-bold text-white">
-              {uploadStatus === 'processing' ? 'Analyzing X-Ray' : uploadStatus === 'completed' ? 'Ready' : 'Upload Scan for AI Analysis'}
+              {uploadStatus === 'processing'
+                ? 'Analyzing X-Ray'
+                : uploadStatus === 'completed'
+                  ? 'Ready'
+                  : 'Upload Scan for AI Analysis'}
             </h3>
           </div>
+
           {uploadStatus !== 'processing' && (
-            <button onClick={onClose} className="text-[#bcc8ce] hover:text-white">
-              <span className="material-symbols-outlined">close</span>
+            <button
+              onClick={onClose}
+              className="text-[#bcc8ce] hover:text-white"
+            >
+              <span className="material-symbols-outlined">
+                close
+              </span>
             </button>
           )}
         </div>
