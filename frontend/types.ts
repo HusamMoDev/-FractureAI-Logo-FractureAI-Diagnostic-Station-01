@@ -1,4 +1,20 @@
-export type PageTab = 
+export type Modality = 'X-Ray' | 'CT' | 'MRI';
+
+export type AIStatus =
+  | 'Normal'
+  | 'Critical'
+  | 'Pending'
+  | 'Review';
+
+export type FractureType =
+  | 'Transverse'
+  | 'Comminuted'
+  | 'Spiral'
+  | 'Hairline'
+  | 'Colles'
+  | 'No Fracture Detected';
+
+export type PageTab =
   | 'dashboard'
   | 'detect'
   | 'analyze'
@@ -9,43 +25,37 @@ export type PageTab =
   | 'report'
   | 'database'
   | 'upload'
-  | 'profile';
-
-export type Modality = 'X-Ray' | 'CT Scan' | 'MRI';
-
-export type AIStatus = 'Critical' | 'Analyzed' | 'Pending' | 'Normal';
-
-export type FractureType = 
-  | 'Transverse' 
-  | 'Comminuted' 
-  | 'Spiral' 
-  | 'Hairline' 
-  | 'Colles' 
-  | 'No Fracture Detected';
+  | 'profile'
+  | 'admin-management'
+  | 'case-details';
 
 export interface ScanRecord {
-  id: string; // e.g. PT-8892A or PX-2023-891A
+  id: string;
   patientName: string;
-  patientAge?: number;
-  dob: string;
   mrn: string;
-  gender: 'Male' | 'Female' | 'Other';
+  gender: string;
+  dob: string;
+  modality: Modality;
+  region: string;
   date: string;
   time: string;
-  modality: Modality;
-  region: string; // e.g. "Left Femur", "Right Wrist", "Thoracic Spine"
+
   status: AIStatus;
-  confidence: number | null; // e.g. 98.5 or null if pending
-  imageUrl: string;
+
+  confidence: number | null;
+
   primaryFinding: string;
-  secondaryFinding?: string;
-  secondaryConfidence?: number;
+
   recommendation: string;
+
   indication: string;
-  technique: string;
+
   findingsList: string[];
+
   impression: string;
-  radiologist: string;
+
+  imageUrl?: string;
+
   obbBox?: {
     top: string;
     left: string;
@@ -57,10 +67,10 @@ export interface ScanRecord {
 }
 
 export interface FilterState {
-  dateRange: string;
+  date: string;
   fractureTypes: FractureType[];
   minConfidence: number;
-  searchQuery: string;
+  search: string;
 }
 
 export interface MeasurementPoint {
@@ -70,15 +80,16 @@ export interface MeasurementPoint {
 
 export interface CaliperMeasurement {
   id: string;
-  p1: MeasurementPoint;
-  p2: MeasurementPoint;
-  distanceMm: number;
+  start: MeasurementPoint;
+  end: MeasurementPoint;
+  distance: number;
+  unit: string;
 }
 
 export interface AngleMeasurement {
   id: string;
-  p1: MeasurementPoint;
-  p2: MeasurementPoint;
-  p3: MeasurementPoint;
-  angleDegrees: number;
+  pointA: MeasurementPoint;
+  vertex: MeasurementPoint;
+  pointB: MeasurementPoint;
+  angle: number;
 }
