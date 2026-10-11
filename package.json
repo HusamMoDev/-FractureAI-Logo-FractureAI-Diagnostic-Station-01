@@ -1,0 +1,11 @@
+{
+  "name": "fractureai-pro-root",
+  "version": "1.0.0",
+  "description": "Root package for running FractureAI Pro",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "install": "npm --prefix frontend install",
+    "build": "npm --prefix frontend run build",
+    "start": "npm --prefix frontend start"
+  }
+}

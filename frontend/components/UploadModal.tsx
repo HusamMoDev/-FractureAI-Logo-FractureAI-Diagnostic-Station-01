@@ -38,7 +38,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       setPatientSex('');
       setModality('');
       setRegion('');
-       setUploadedBase64(null);
+      setUploadedBase64(null);
       setSelectedFile(null);
 
       setUploadStatus('idle');
@@ -111,39 +111,44 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   };
 
   const createPendingScanRecord = (
-  caseId: string,
-  mrn: string,
-  imageUrl: string,
-): ScanRecord => {
-  return {
-    id: caseId,
-    patientName,
-    patientAge: Number(patientAge),
-    dob: '',
-    mrn,
-    gender: patientSex,
-    date: new Date().toISOString().split('T')[0],
-    time: new Date().toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-    }),
-    modality: modality as Modality,
-    region,
-    status: 'Pending',
-    confidence: null,
-    imageUrl,
-    primaryFinding: 'Analysis pending',
-    secondaryFinding: '',
-    secondaryConfidence: 0,
-    recommendation: 'AI analysis is pending.',
-    indication: '',
-    technique: `${modality} acquisition.`,
-    findingsList: [],
-    impression: 'AI analysis is pending.',
-    radiologist: '',
-    obbBox: undefined,
+    caseId: string,
+    mrn: string,
+    imageUrl: string,
+  ): ScanRecord => {
+    const ageNum = Number(patientAge);
+    const validAge = !isNaN(ageNum) && ageNum >= 0 ? ageNum : undefined;
+    const birthYear = validAge !== undefined ? new Date().getFullYear() - validAge : null;
+    const estimatedDob = birthYear ? `${birthYear}-01-01` : '';
+
+    return {
+      id: caseId,
+      patientName,
+      patientAge: validAge,
+      dob: estimatedDob,
+      mrn,
+      gender: patientSex,
+      date: new Date().toISOString().split('T')[0],
+      time: new Date().toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      modality: modality as Modality,
+      region,
+      status: 'Pending',
+      confidence: null,
+      imageUrl,
+      primaryFinding: 'Analysis pending',
+      secondaryFinding: '',
+      secondaryConfidence: 0,
+      recommendation: 'AI analysis is pending.',
+      indication: '',
+      technique: `${modality} acquisition.`,
+      findingsList: [],
+      impression: 'AI analysis is pending.',
+      radiologist: '',
+      obbBox: undefined,
+    };
   };
-};
 
   const simulateProgress = (
     progress: number,
@@ -249,6 +254,11 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       // ---------------------------------------------------------
       simulateProgress(25, 1);
 
+      const ageNum = Number(patientAge);
+      const validAge = !isNaN(ageNum) && ageNum >= 0 ? ageNum : undefined;
+      const birthYear = validAge !== undefined ? new Date().getFullYear() - validAge : null;
+      const estimatedDob = birthYear ? `${birthYear}-01-01` : null;
+
       const {
         data: patient,
         error: patientError,
@@ -260,10 +270,21 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
       if (patientError || !patient) {
         throw new Error(
-          `Could not find or create patient: ${
-            patientError?.message || 'Unknown error'
+          `Could not find or create patient: ${patientError?.message || 'Unknown error'
           }`,
         );
+      }
+
+      // Persist estimated birth date on the patient record if not already present
+      if (patient.id && estimatedDob) {
+        try {
+          await supabase
+            .from('patients')
+            .update({ birth_of_date: estimatedDob })
+            .eq('id', patient.id);
+        } catch (updateErr) {
+          console.warn('Could not update patient birth_of_date in Supabase:', updateErr);
+        }
       }
 
       const mrn = patient.number_record_medical as string;
@@ -279,17 +300,20 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       // ---------------------------------------------------------
       simulateProgress(40, 1);
 
-     const { data: caseId, error: caseError } = await supabase.rpc('case_create', {
-  id_patient_p: patient.id,
-  part_body_p: region.trim(),
-  priority_p: 'normal',
-  summary_p: `X-Ray examination for ${patientName.trim()}.`,
-});
+      const summaryText = validAge !== undefined
+        ? `X-Ray examination for ${patientName.trim()}. Age: ${validAge}.`
+        : `X-Ray examination for ${patientName.trim()}.`;
+
+      const { data: caseId, error: caseError } = await supabase.rpc('case_create', {
+        id_patient_p: patient.id,
+        part_body_p: region.trim(),
+        priority_p: 'normal',
+        summary_p: summaryText,
+      });
 
       if (caseError || !caseId) {
         throw new Error(
-          `Could not create case: ${
-            caseError?.message || 'No case ID returned.'
+          `Could not create case: ${caseError?.message || 'No case ID returned.'
           }`,
         );
       }
@@ -372,8 +396,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           .remove([storagePath]);
 
         throw new Error(
-          `Could not create X-Ray metadata: ${
-            imageRecordError?.message || 'Unknown error'
+          `Could not create X-Ray metadata: ${imageRecordError?.message || 'Unknown error'
           }`,
         );
       }
@@ -661,11 +684,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               type="text"
               value={patientName}
               onChange={(e) => setPatientName(e.target.value)}
-              className={`w-full bg-[#0D1626] border ${
-                !patientName.trim()
+              className={`w-full bg-[#0D1626] border ${!patientName.trim()
                   ? 'border-red-500/50'
                   : 'border-white/10'
-              } rounded-lg p-2 text-white focus:outline-none focus:border-[#00B4DB]`}
+                } rounded-lg p-2 text-white focus:outline-none focus:border-[#00B4DB]`}
               placeholder="Patient name"
             />
 
@@ -687,13 +709,12 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               max="120"
               value={patientAge}
               onChange={(e) => setPatientAge(e.target.value)}
-              className={`w-full bg-[#0D1626] border ${
-                patientAge.trim() !== '' && !isAgeValid
+              className={`w-full bg-[#0D1626] border ${patientAge.trim() !== '' && !isAgeValid
                   ? 'border-red-500 focus:border-red-500'
                   : !patientAge.trim()
                     ? 'border-red-500/50 focus:border-red-500/50'
                     : 'border-white/10 focus:border-[#00B4DB]'
-              } rounded-lg p-2 text-white focus:outline-none`}
+                } rounded-lg p-2 text-white focus:outline-none`}
               placeholder="e.g. 25"
             />
 
@@ -720,16 +741,15 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             <select
               value={patientSex}
               onChange={(e) => setPatientSex(e.target.value)}
-              className={`w-full bg-[#0D1626] border ${
-                !patientSex
+              className={`w-full bg-[#0D1626] border ${!patientSex
                   ? 'border-red-500/50'
                   : 'border-white/10'
-              } rounded-lg p-2 text-white focus:outline-none focus:border-[#00B4DB] appearance-none`}
+                } rounded-lg p-2 text-white focus:outline-none focus:border-[#00B4DB] appearance-none`}
             >
               <option value="">Select sex</option>
               <option value="Male">Male</option>
               <option value="Female">Female</option>
-              <option value="Other">Other</option>
+
             </select>
 
             {!patientSex && (
@@ -766,11 +786,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             type="text"
             value={region}
             onChange={(e) => setRegion(e.target.value)}
-            className={`w-full bg-[#0D1626] border ${
-              !region.trim()
+            className={`w-full bg-[#0D1626] border ${!region.trim()
                 ? 'border-red-500/50'
                 : 'border-white/10'
-            } rounded-lg p-2 text-white focus:outline-none focus:border-[#00B4DB]`}
+              } rounded-lg p-2 text-white focus:outline-none focus:border-[#00B4DB]`}
             placeholder="e.g. Left Femur"
           />
         </div>
@@ -808,11 +827,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               onChange={(e) =>
                 setRegion(e.target.value)
               }
-              className={`w-full bg-[#0D1626] border ${
-                !region.trim()
+              className={`w-full bg-[#0D1626] border ${!region.trim()
                   ? 'border-red-500/50'
                   : 'border-white/10'
-              } rounded-lg p-2 text-white focus:outline-none focus:border-[#00B4DB]`}
+                } rounded-lg p-2 text-white focus:outline-none focus:border-[#00B4DB]`}
               placeholder="e.g. Left Femur"
             />
           </div>
@@ -856,7 +874,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               <button
                 onClick={() => {
                   setUploadedBase64(null);
-                             setSelectedFile(null);
+                  setSelectedFile(null);
                 }}
                 className="w-8 h-8 flex items-center justify-center rounded-full bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
                 title="Remove Image"

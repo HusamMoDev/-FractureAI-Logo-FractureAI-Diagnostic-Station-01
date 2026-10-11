@@ -69,9 +69,9 @@ interface FinalDiagnosisData {
   case_id: string;
   primary_prediction_id: string | null;
   final_verdict:
-    | 'confirmed_fracture'
-    | 'no_fracture'
-    | 'uncertain';
+  | 'confirmed_fracture'
+  | 'no_fracture'
+  | 'uncertain';
   fracture_type: string | null;
   severity: string | null;
   clinical_notes: string | null;
@@ -180,13 +180,28 @@ export const ReportModal: React.FC<ReportModalProps> = ({
 
   const age = useMemo(() => {
     if (caseData?.patient?.birth_of_date) {
-      return calculateAge(
+      const computed = calculateAge(
         caseData.patient.birth_of_date,
       );
+      if (computed !== null) return computed;
     }
 
-    return scan.patientAge ?? null;
-  }, [caseData, scan.patientAge]);
+    if (scan.patientAge !== undefined && scan.patientAge !== null && !isNaN(Number(scan.patientAge))) {
+      return Number(scan.patientAge);
+    }
+
+    if (scan.dob) {
+      const computed = calculateAge(scan.dob);
+      if (computed !== null) return computed;
+    }
+
+    if (caseData?.summary_clinical) {
+      const match = caseData.summary_clinical.match(/Age:\s*(\d+)/i);
+      if (match) return parseInt(match[1], 10);
+    }
+
+    return null;
+  }, [caseData, scan.patientAge, scan.dob]);
 
   /*
    * Prediction confidence is stored as 0..1.
@@ -194,10 +209,10 @@ export const ReportModal: React.FC<ReportModalProps> = ({
    */
   const confidence =
     prediction?.confidence_overall !== null &&
-    prediction?.confidence_overall !== undefined
+      prediction?.confidence_overall !== undefined
       ? prediction.confidence_overall * 100
       : typeof scan.confidence === 'number' &&
-          scan.confidence > 0
+        scan.confidence > 0
         ? scan.confidence
         : null;
 
@@ -606,19 +621,19 @@ export const ReportModal: React.FC<ReportModalProps> = ({
 
       const aiSummary = prediction
         ? {
-            prediction_id: prediction.id,
-            status: prediction.status,
-            detected_fracture:
-              prediction.detected_fracture,
-            confidence_overall:
-              prediction.confidence_overall,
-            boxes_count:
-              predictionBoxes.length,
-            processing_ms:
-              prediction.ms_processing,
-            prediction_created_at:
-              prediction.at_created,
-          }
+          prediction_id: prediction.id,
+          status: prediction.status,
+          detected_fracture:
+            prediction.detected_fracture,
+          confidence_overall:
+            prediction.confidence_overall,
+          boxes_count:
+            predictionBoxes.length,
+          processing_ms:
+            prediction.ms_processing,
+          prediction_created_at:
+            prediction.at_created,
+        }
         : null;
 
       const payload = {
@@ -745,14 +760,14 @@ export const ReportModal: React.FC<ReportModalProps> = ({
 
         findingsList: savedReport?.report_findings
           ? savedReport.report_findings
-              .split('\n')
-              .map((item) => item.trim())
-              .filter(Boolean)
+            .split('\n')
+            .map((item) => item.trim())
+            .filter(Boolean)
           : scan.findingsList,
 
         confidence:
           prediction?.confidence_overall !== null &&
-          prediction?.confidence_overall !== undefined
+            prediction?.confidence_overall !== undefined
             ? prediction.confidence_overall * 100
             : null,
 
@@ -767,7 +782,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
           prediction?.status === 'succeeded'
             ? prediction.detected_fracture
               ? predictionBoxes[0]?.label ||
-                'Fracture Detected'
+              'Fracture Detected'
               : 'No Fracture Detected'
             : 'AI analysis pending',
       };
@@ -858,13 +873,13 @@ export const ReportModal: React.FC<ReportModalProps> = ({
         findingsList:
           finalizedReport.report_findings
             ? finalizedReport.report_findings
-                .split('\n')
-                .map((item) => item.trim())
-                .filter(Boolean)
+              .split('\n')
+              .map((item) => item.trim())
+              .filter(Boolean)
             : scan.findingsList,
         confidence:
           prediction?.confidence_overall !== null &&
-          prediction?.confidence_overall !== undefined
+            prediction?.confidence_overall !== undefined
             ? prediction.confidence_overall * 100
             : null,
         status:
@@ -877,7 +892,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
           prediction?.status === 'succeeded'
             ? prediction.detected_fracture
               ? predictionBoxes[0]?.label ||
-                'Fracture Detected'
+              'Fracture Detected'
               : 'No Fracture Detected'
             : 'AI analysis pending',
       });
@@ -997,7 +1012,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
 
                 <p className="font-semibold text-sm mt-1">
                   {age !== null
-                    ? `${age} years`
+                    ? `${age} `
                     : 'Not available'}
                   {' / '}
                   {caseData?.patient?.sex ||
@@ -1184,7 +1199,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                       {prediction?.confidence_overall !==
                         null &&
                         prediction?.confidence_overall !==
-                          undefined && (
+                        undefined && (
                           <p className="text-[10px] text-emerald-600 mt-3">
                             Overall confidence:{' '}
                             {(
@@ -1256,11 +1271,10 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                     </div>
 
                     <span
-                      className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
-                        reportIsFinalized
+                      className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${reportIsFinalized
                           ? 'bg-emerald-100 text-emerald-700'
                           : 'bg-amber-100 text-amber-700'
-                      }`}
+                        }`}
                     >
                       {reportIsFinalized
                         ? 'FINALIZED'
@@ -1287,8 +1301,8 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                       <p className="text-sm font-bold text-slate-800 mt-1">
                         {finalDiagnosis
                           ? formatDiagnosisStatus(
-                              finalDiagnosis.final_verdict,
-                            )
+                            finalDiagnosis.final_verdict,
+                          )
                           : 'No finalized diagnosis'}
                       </p>
                     </div>
@@ -1387,15 +1401,14 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                     </div>
 
                     <span
-                      className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
-                        aiDetectedFracture
+                      className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${aiDetectedFracture
                           ? 'bg-red-100 text-red-700'
                           : aiNoFracture
                             ? 'bg-emerald-100 text-emerald-700'
                             : aiFailed
                               ? 'bg-red-100 text-red-700'
                               : 'bg-amber-100 text-amber-700'
-                      }`}
+                        }`}
                     >
                       {!hasAiPrediction
                         ? 'PENDING'

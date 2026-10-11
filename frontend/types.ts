@@ -32,6 +32,7 @@ export type PageTab =
 export interface ScanRecord {
   id: string;
   patientName: string;
+  patientAge?: number;
   mrn: string;
   gender: string;
   dob: string;
@@ -45,14 +46,18 @@ export interface ScanRecord {
   confidence: number | null;
 
   primaryFinding: string;
+  secondaryFinding?: string;
+  secondaryConfidence?: number;
 
   recommendation: string;
 
   indication: string;
+  technique?: string;
 
   findingsList: string[];
 
   impression: string;
+  radiologist?: string;
 
   imageUrl?: string;
 

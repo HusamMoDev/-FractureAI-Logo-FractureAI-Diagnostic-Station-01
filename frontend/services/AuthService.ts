@@ -31,7 +31,25 @@ export interface AuthResponse {
   message?: string;
 }
 
+export class AuthOperationError extends Error {
+  code?: string;
+  status?: number;
+  originalMessage?: string;
+
+  constructor(
+    message: string,
+    details?: { code?: string; status?: number; originalMessage?: string }
+  ) {
+    super(message);
+    this.name = 'AuthOperationError';
+    this.code = details?.code;
+    this.status = details?.status;
+    this.originalMessage = details?.originalMessage;
+  }
+}
+
 class AuthService {
+  private isRegistering = false;
   /**
    * Convert Supabase profile data into the application's User object.
    */
@@ -163,9 +181,22 @@ class AuthService {
       });
 
     if (error) {
-      console.error('Login error:', error);
-      throw new Error(
-        this.getAuthErrorMessage(error.message)
+      if (import.meta.env.DEV) {
+        console.error('[Supabase Auth Login Error]', {
+          status: error.status,
+          code: error.code,
+          message: error.message,
+          name: error.name,
+        });
+      }
+
+      throw new AuthOperationError(
+        this.getAuthErrorMessage(error),
+        {
+          code: error.code,
+          status: error.status,
+          originalMessage: error.message,
+        }
       );
     }
 
@@ -206,82 +237,104 @@ class AuthService {
    * This is NOT an error.
    */
   async register(data: RegisterData): Promise<AuthResponse> {
-    const fullName = data.fullName.trim();
-    const email = data.email.trim().toLowerCase();
-    const password = data.password ?? '';
-
-    if (!fullName) {
-      throw new Error('Please enter your full name.');
-    }
-
-    if (!email) {
-      throw new Error('Please enter your email address.');
-    }
-
-    if (!password) {
-      throw new Error('Please enter a password.');
-    }
-
-    if (password.length < 6) {
-      throw new Error(
-        'Password must contain at least 6 characters.'
+    if (this.isRegistering) {
+      throw new AuthOperationError(
+        'A registration request is already in progress. Please wait a moment.'
       );
     }
 
-    const { data: signUpData, error } =
-      await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
+    this.isRegistering = true;
+
+    try {
+      const fullName = data.fullName.trim();
+      const email = data.email.trim().toLowerCase();
+      const password = data.password ?? '';
+
+      if (!fullName) {
+        throw new AuthOperationError('Please enter your full name.');
+      }
+
+      if (!email) {
+        throw new AuthOperationError('Please enter your email address.');
+      }
+
+      if (!password) {
+        throw new AuthOperationError('Please enter a password.');
+      }
+
+      if (password.length < 6) {
+        throw new AuthOperationError(
+          'Password must contain at least 6 characters.'
+        );
+      }
+
+      const { data: signUpData, error } =
+        await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: fullName,
+            },
           },
-        },
-      });
+        });
 
-    if (error) {
-      console.error('Registration error:', error);
+      if (error) {
+        if (import.meta.env.DEV) {
+          console.error('[Supabase Auth Registration Error]', {
+            status: error.status,
+            code: error.code,
+            message: error.message,
+            name: error.name,
+          });
+        }
 
-      throw new Error(
-        this.getAuthErrorMessage(error.message)
-      );
+        const userFriendlyMessage = this.getAuthErrorMessage(error);
+        throw new AuthOperationError(userFriendlyMessage, {
+          code: error.code,
+          status: error.status,
+          originalMessage: error.message,
+        });
+      }
+
+      if (!signUpData.user) {
+        throw new AuthOperationError(
+          'Registration could not be completed. Please try again.'
+        );
+      }
+
+      /**
+       * The database trigger has already created the profile.
+       *
+       * Expected new-user state:
+       *
+       * role       = technician
+       * active_is  = false
+       * id_clinic  = null
+       *
+       * This is the CORRECT state for a newly registered user.
+       */
+
+      /**
+       * If Supabase immediately created a session,
+       * sign it out because the account still needs
+       * administrator approval.
+       */
+      if (signUpData.session) {
+        await supabase.auth.signOut();
+      }
+
+      return {
+        user: null,
+        token: null,
+        requiresEmailConfirmation: !signUpData.session,
+        requiresApproval: true,
+        message:
+          'Account created successfully. Please wait for administrator approval before logging in.',
+      };
+    } finally {
+      this.isRegistering = false;
     }
-
-    if (!signUpData.user) {
-      throw new Error(
-        'Registration could not be completed. Please try again.'
-      );
-    }
-
-    /**
-     * The database trigger has already created the profile.
-     *
-     * Expected new-user state:
-     *
-     * role       = technician
-     * active_is  = false
-     * id_clinic  = null
-     *
-     * This is the CORRECT state for a newly registered user.
-     */
-
-    /**
-     * If Supabase immediately created a session,
-     * sign it out because the account still needs
-     * administrator approval.
-     */
-    if (signUpData.session) {
-      await supabase.auth.signOut();
-    }
-
-    return {
-      user: null,
-      token: null,
-      requiresEmailConfirmation: !signUpData.session,
-      requiresApproval: true,
-      message:
-        'Account created successfully. Please wait for administrator approval before logging in.',
-    };
   }
 
   /**
@@ -302,13 +355,22 @@ class AuthService {
       );
 
     if (error) {
-      console.error(
-        'Password reset error:',
-        error
-      );
+      if (import.meta.env.DEV) {
+        console.error('[Supabase Auth Password Reset Error]', {
+          status: error.status,
+          code: error.code,
+          message: error.message,
+          name: error.name,
+        });
+      }
 
-      throw new Error(
-        this.getAuthErrorMessage(error.message)
+      throw new AuthOperationError(
+        this.getAuthErrorMessage(error),
+        {
+          code: error.code,
+          status: error.status,
+          originalMessage: error.message,
+        }
       );
     }
   }
@@ -405,10 +467,39 @@ class AuthService {
    * into user-friendly messages.
    */
   private getAuthErrorMessage(
-    message: string
+    errorOrMessage:
+      | { message?: string; status?: number; code?: string }
+      | string
   ): string {
-    const normalizedMessage =
-      message.toLowerCase();
+    const rawMessage =
+      typeof errorOrMessage === 'object' && errorOrMessage?.message
+        ? String(errorOrMessage.message)
+        : typeof errorOrMessage === 'string'
+        ? errorOrMessage
+        : '';
+
+    const code =
+      typeof errorOrMessage === 'object' && errorOrMessage?.code
+        ? String(errorOrMessage.code).toLowerCase()
+        : '';
+
+    const status =
+      typeof errorOrMessage === 'object' &&
+      typeof errorOrMessage?.status === 'number'
+        ? errorOrMessage.status
+        : null;
+
+    const normalizedMessage = rawMessage.toLowerCase();
+
+    if (
+      status === 429 ||
+      code === 'over_email_send_rate_limit' ||
+      code.includes('rate_limit') ||
+      normalizedMessage.includes('rate limit') ||
+      normalizedMessage.includes('over_email_send_rate_limit')
+    ) {
+      return 'Email delivery is temporarily limited due to high request volume. Please wait a while before requesting another registration or verification email.';
+    }
 
     if (
       normalizedMessage.includes(
@@ -446,21 +537,13 @@ class AuthService {
     }
 
     if (
-      normalizedMessage.includes(
-        'rate limit'
-      )
-    ) {
-      return 'Too many attempts. Please wait a moment and try again.';
-    }
-
-    if (
       normalizedMessage.includes('email')
     ) {
       return 'Please check the email address and try again.';
     }
 
     return (
-      message ||
+      rawMessage ||
       'Authentication failed. Please try again.'
     );
   }

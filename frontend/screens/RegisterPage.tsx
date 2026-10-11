@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Eye,
   EyeOff,
@@ -11,7 +11,7 @@ import {
 import { authService } from '../services/AuthService';
 
 interface RegisterPageProps {
-  onRegisterSuccess: () => void;
+  onRegisterSuccess: (noticeMessage?: string) => void;
   onNavigate: (view: 'login') => void;
 }
 
@@ -26,6 +26,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({
   const [showPassword, setShowPassword] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -86,6 +87,10 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (isLoading || isSubmittingRef.current) {
+      return;
+    }
+
     setErrors({});
     setSuccessMessage('');
 
@@ -94,6 +99,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({
     }
 
     setIsLoading(true);
+    isSubmittingRef.current = true;
 
     try {
       const response = await authService.register({
@@ -102,18 +108,19 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({
         password,
       });
 
-      setSuccessMessage(
+      const notice =
         response.message ||
-          'Account created successfully. Please wait for administrator approval.'
-      );
+        'Account created successfully. Please wait for administrator approval before logging in.';
+
+      setSuccessMessage(notice);
 
       /*
        * Give the user a moment to see the success message,
-       * then return to the Login page.
+       * then return to the Login page with notice.
        */
       setTimeout(() => {
-        onRegisterSuccess();
-      }, 1800);
+        onRegisterSuccess(notice);
+      }, 1500);
     } catch (err: any) {
       setErrors({
         general:
@@ -122,6 +129,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({
       });
     } finally {
       setIsLoading(false);
+      isSubmittingRef.current = false;
     }
   };
 

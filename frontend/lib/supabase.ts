@@ -19,7 +19,7 @@ if (!supabaseUrl || !supabasePublishableKey) {
  * to control whether the Supabase session survives
  * browser restarts.
  */
-const authStorage: Storage = {
+const authStorage = {
   getItem(key: string): string | null {
     if (typeof window === 'undefined') {
       return null

@@ -154,7 +154,17 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`FractureAI Server running on http://0.0.0.0:${PORT}`);
+    console.log(`FractureAI Server running on http://localhost:${PORT}`);
+    console.log(`(Network access: http://0.0.0.0:${PORT})`);
+    
+    // Automatically open the browser if in development
+    if (process.env.NODE_ENV !== 'production') {
+      import('child_process').then(({ exec }) => {
+        // 'start' works on Windows, 'open' on Mac, 'xdg-open' on Linux
+        const command = process.platform === 'win32' ? 'start' : process.platform === 'darwin' ? 'open' : 'xdg-open';
+        exec(`${command} http://localhost:${PORT}`);
+      }).catch(() => {});
+    }
   });
 }
 

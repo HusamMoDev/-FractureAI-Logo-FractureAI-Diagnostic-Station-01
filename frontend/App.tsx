@@ -39,69 +39,69 @@ import { authService } from './services/AuthService';
 
 type SupabasePredictionRow = {
 
-  id: string;
+  id: string;
 
-  status: string | null;
+  status: string | null;
 
-  detected_fracture: boolean | null;
+  detected_fracture: boolean | null;
 
-  confidence_overall: number | null;
+  confidence_overall: number | null;
 
-  response_raw: unknown;
+  response_raw: unknown;
 
-  message_error: string | null;
+  message_error: string | null;
 
-  ms_processing: number | null;
+  ms_processing: number | null;
 
-  at_created: string | null;
-
-
-
-  boxes_prediction:
-
-    | {
-
-        id: string;
-
-        id_type_fracture: string | null;
-
-        min_x: number;
-
-        min_y: number;
-
-        max_x: number;
-
-        max_y: number;
-
-        confidence: number;
-
-        label: string;
-
-        at_created: string;
+  at_created: string | null;
 
 
 
-        types_fracture:
+  boxes_prediction:
 
-          | {
+    | {
 
-              id: string;
+        id: string;
 
-              code: string;
+        id_type_fracture: string | null;
 
-              en_label: string;
+        min_x: number;
 
-              ar_label: string | null;
+        min_y: number;
 
-              description: string | null;
+        max_x: number;
 
-            }
+        max_y: number;
 
-          | null;
+        confidence: number;
 
-      }[]
+        label: string;
 
-    | null;
+        at_created: string;
+
+
+
+        types_fracture:
+
+          | {
+
+              id: string;
+
+              code: string;
+
+              en_label: string;
+
+              ar_label: string | null;
+
+              description: string | null;
+
+            }
+
+          | null;
+
+      }[]
+
+    | null;
 
 };
 
@@ -109,75 +109,77 @@ type SupabasePredictionRow = {
 
 type SupabaseCaseRow = {
 
-  id: string;
+  id: string;
 
-  part_body: string | null;
+  part_body: string | null;
 
-  status: string | null;
+  status: string | null;
 
-  priority: string | null;
+  priority: string | null;
 
-  at_created: string | null;
+  summary_clinical?: string | null;
 
-
-
-  patients:
-
-    | {
-
-        id: string;
-
-        name_full: string | null;
-
-        number_record_medical: string | null;
-
-        sex: string | null;
-
-        birth_of_date: string | null;
-
-      }
-
-    | {
-
-        id: string;
-
-        name_full: string | null;
-
-        number_record_medical: string | null;
-
-        sex: string | null;
-
-        birth_of_date: string | null;
-
-      }[]
-
-    | null;
+  at_created: string | null;
 
 
 
-  images_xray:
+  patients:
 
-    | {
+    | {
 
-        id: string;
+        id: string;
 
-        filename_original: string | null;
+        name_full: string | null;
 
-        status_inference: string | null;
+        number_record_medical: string | null;
 
-        path_storage: string | null;
+        sex: string | null;
 
-        bucket_storage: string | null;
+        birth_of_date: string | null;
+
+      }
+
+    | {
+
+        id: string;
+
+        name_full: string | null;
+
+        number_record_medical: string | null;
+
+        sex: string | null;
+
+        birth_of_date: string | null;
+
+      }[]
+
+    | null;
 
 
 
-        predictions_ai:
+  images_xray:
 
-          | SupabasePredictionRow[]
+    | {
 
-          | null;
+        id: string;
 
-      }[] | null;
+        filename_original: string | null;
+
+        status_inference: string | null;
+
+        path_storage: string | null;
+
+        bucket_storage: string | null;
+
+
+
+        predictions_ai:
+
+          | SupabasePredictionRow[]
+
+          | null;
+
+      }[] | null;
 
 };
 
@@ -185,293 +187,310 @@ type SupabaseCaseRow = {
 
 const emptyScanList: ScanRecord[] = [];
 
+const calculateAgeFromDob = (birthDate: string | null | undefined): number | undefined => {
+  if (!birthDate) return undefined;
+  const birth = new Date(`${birthDate}T00:00:00`);
+  if (isNaN(birth.getTime())) return undefined;
+  const today = new Date();
+  let calculatedAge = today.getFullYear() - birth.getFullYear();
+  const monthDiff = today.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+    calculatedAge -= 1;
+  }
+  return calculatedAge >= 0 ? calculatedAge : undefined;
+};
 
+const extractAgeFromSummary = (summary: string | null | undefined): number | undefined => {
+  if (!summary) return undefined;
+  const match = summary.match(/Age:\s*(\d+)/i);
+  return match ? parseInt(match[1], 10) : undefined;
+};
 
 const mapCaseToScanRecord = (
 
-  row: SupabaseCaseRow
+  row: SupabaseCaseRow
 
 ): ScanRecord => {
 
-  const patient = Array.isArray(row.patients)
+  const patient = Array.isArray(row.patients)
 
-    ? row.patients[0]
+    ? row.patients[0]
 
-    : row.patients;
+    : row.patients;
 
 
 
-  const image = Array.isArray(row.images_xray)
+  const image = Array.isArray(row.images_xray)
 
-    ? row.images_xray[0]
+    ? row.images_xray[0]
 
-    : undefined;
+    : undefined;
 
 
 
-  const prediction =
+  const prediction =
 
-    image?.predictions_ai &&
+    image?.predictions_ai &&
 
-    image.predictions_ai.length > 0
+    image.predictions_ai.length > 0
 
-      ? image.predictions_ai[0]
+      ? image.predictions_ai[0]
 
-      : undefined;
+      : undefined;
 
 
 
-  const box =
+  const box =
 
-    prediction?.boxes_prediction &&
+    prediction?.boxes_prediction &&
 
-    prediction.boxes_prediction.length > 0
+    prediction.boxes_prediction.length > 0
 
-      ? prediction.boxes_prediction[0]
+      ? prediction.boxes_prediction[0]
 
-      : undefined;
+      : undefined;
 
 
 
-  const createdAt = row.at_created
+  const createdAt = row.at_created
 
-    ? new Date(row.at_created)
+    ? new Date(row.at_created)
 
-    : null;
+    : null;
 
 
 
-  const date =
+  const date =
 
-    createdAt &&
+    createdAt &&
 
-    !Number.isNaN(createdAt.getTime())
+    !Number.isNaN(createdAt.getTime())
 
-      ? createdAt.toISOString().split('T')[0]
+      ? createdAt.toISOString().split('T')[0]
 
-      : '';
+      : '';
 
 
 
-  const time =
+  const time =
 
-    createdAt &&
+    createdAt &&
 
-    !Number.isNaN(createdAt.getTime())
+    !Number.isNaN(createdAt.getTime())
 
-      ? createdAt.toLocaleTimeString([], {
+      ? createdAt.toLocaleTimeString([], {
 
-          hour: '2-digit',
+          hour: '2-digit',
 
-          minute: '2-digit',
+          minute: '2-digit',
 
-        })
+        })
 
-      : '';
+      : '';
 
 
 
-  const confidence =
+  const confidence =
 
-    prediction?.confidence_overall != null
+    prediction?.confidence_overall != null
 
-      ? prediction.confidence_overall * 100
+      ? prediction.confidence_overall * 100
 
-      : null;
+      : null;
 
 
 
-  const hasSuccessfulPrediction =
+  const hasSuccessfulPrediction =
 
-    prediction?.status === 'succeeded';
+    prediction?.status === 'succeeded';
 
 
 
-  const primaryFinding = hasSuccessfulPrediction
+  const primaryFinding = hasSuccessfulPrediction
 
-    ? prediction.detected_fracture
+    ? prediction.detected_fracture
 
-      ? 'Fracture detected'
+      ? 'Fracture detected'
 
-      : 'No fracture detected'
+      : 'No fracture detected'
 
-    : 'Analysis pending';
+    : 'Analysis pending';
 
 
 
-  const status: ScanRecord['status'] =
+  const status: ScanRecord['status'] =
 
-    hasSuccessfulPrediction
+    hasSuccessfulPrediction
 
-      ? prediction.detected_fracture
+      ? prediction.detected_fracture
 
-        ? 'Critical'
+        ? 'Critical'
 
-        : 'Normal'
+        : 'Normal'
 
-      : 'Pending';
+      : 'Pending';
 
 
 
-  const gender: ScanRecord['gender'] =
+  const gender: ScanRecord['gender'] =
 
-    patient?.sex === 'Male'
+    patient?.sex === 'Male'
 
-      ? 'Male'
+      ? 'Male'
 
-      : patient?.sex === 'Female'
+      : patient?.sex === 'Female'
 
-        ? 'Female'
+        ? 'Female'
 
-        : 'Other';
+        : 'Other';
 
 
 
-  return {
+  return {
 
-    id: row.id,
+    id: row.id,
 
 
 
-    patientName:
+    patientName:
 
-      patient?.name_full || 'Unknown Patient',
+      patient?.name_full || 'Unknown Patient',
 
 
 
-    patientAge: undefined,
+    patientAge: calculateAgeFromDob(patient?.birth_of_date) ?? extractAgeFromSummary(row.summary_clinical),
 
 
 
-    dob:
+    dob:
 
-      patient?.birth_of_date || '',
+      patient?.birth_of_date || '',
 
 
 
-    mrn:
+    mrn:
 
-      patient?.number_record_medical || '',
+      patient?.number_record_medical || '',
 
 
 
-    gender,
+    gender,
 
 
 
-    date,
+    date,
 
 
 
-    time,
+    time,
 
 
 
-    modality: 'X-Ray',
+    modality: 'X-Ray',
 
 
 
-    region:
+    region:
 
-      row.part_body || 'Not specified',
+      row.part_body || 'Not specified',
 
 
 
-    status,
+    status,
 
 
 
-    confidence,
+    confidence,
 
 
 
-    primaryFinding,
+    primaryFinding,
 
 
 
-    secondaryFinding: '',
+    secondaryFinding: '',
 
 
 
-    secondaryConfidence: 0,
+    secondaryConfidence: 0,
 
 
 
-    recommendation:
+    recommendation:
 
-      hasSuccessfulPrediction
+      hasSuccessfulPrediction
 
-        ? prediction.detected_fracture
+        ? prediction.detected_fracture
 
-          ? 'Review the detected fracture findings.'
+          ? 'Review the detected fracture findings.'
 
-          : 'No fracture detected by the AI model.'
+          : 'No fracture detected by the AI model.'
 
-        : 'AI analysis is pending.',
+        : 'AI analysis is pending.',
 
 
 
-    indication: '',
+    indication: '',
 
 
 
-    technique: 'X-Ray examination',
+    technique: 'X-Ray examination',
 
 
 
-    findingsList: [],
+    findingsList: [],
 
 
 
-    impression:
+    impression:
 
-      hasSuccessfulPrediction
+      hasSuccessfulPrediction
 
-        ? prediction.detected_fracture
+        ? prediction.detected_fracture
 
-          ? 'Fracture detected by the AI model.'
+          ? 'Fracture detected by the AI model.'
 
-          : 'No fracture detected by the AI model.'
+          : 'No fracture detected by the AI model.'
 
-        : 'AI analysis is pending.',
+        : 'AI analysis is pending.',
 
 
 
-    radiologist: '',
+    radiologist: '',
 
 
 
-    imageUrl: '',
+    imageUrl: '',
 
 
 
-    obbBox: box
+    obbBox: box
 
-      ? {
+      ? {
 
-          top: `${box.min_y * 100}%`,
+          top: `${box.min_y * 100}%`,
 
-          left: `${box.min_x * 100}%`,
+          left: `${box.min_x * 100}%`,
 
-          width: `${(box.max_x - box.min_x) * 100}%`,
+          width: `${(box.max_x - box.min_x) * 100}%`,
 
-          height: `${(box.max_y - box.min_y) * 100}%`,
+          height: `${(box.max_y - box.min_y) * 100}%`,
 
-          rotation: '0deg',
+          rotation: '0deg',
 
-          label:
+          label:
 
-            box.types_fracture?.en_label ||
+            box.types_fracture?.en_label ||
 
-            box.label ||
+            box.label ||
 
-            'Fracture',
+            'Fracture',
 
-        }
+        }
 
-      : undefined,
+      : undefined,
 
-  };
+  };
 
 };
 
@@ -479,390 +498,392 @@ const mapCaseToScanRecord = (
 
 export function App() {
 
-  const [showSplash, setShowSplash] =
+  const [showSplash, setShowSplash] =
 
-    useState<boolean>(true);
+    useState<boolean>(true);
 
 
 
-  const [isAuthenticated, setIsAuthenticated] =
+  const [isAuthenticated, setIsAuthenticated] =
 
-    useState<boolean>(false);
+    useState<boolean>(false);
 
   const [authReady, setAuthReady] =
     useState<boolean>(false);
 
 
 
-  const [scans, setScans] =
+  const [scans, setScans] =
 
-    useState<ScanRecord[]>(emptyScanList);
+    useState<ScanRecord[]>(emptyScanList);
 
 
 
-  const [currentScan, setCurrentScan] =
+  const [currentScan, setCurrentScan] =
 
-    useState<ScanRecord | null>(null);
+    useState<ScanRecord | null>(null);
 
 
 
-  const [activeTab, setActiveTab] =
+  const [activeTab, setActiveTab] =
 
-    useState<PageTab>('detect');
+    useState<PageTab>('detect');
 
 
 
-  const [searchQuery, setSearchQuery] =
+  const [searchQuery, setSearchQuery] =
 
-    useState<string>('');
+    useState<string>('');
 
 
 
-  const [lang, setLang] =
+  const [lang, setLang] =
 
-    useState<'en' | 'ar'>('en');
+    useState<'en' | 'ar'>('en');
 
 
 
-  const [isLoadingCases, setIsLoadingCases] =
+  const [isLoadingCases, setIsLoadingCases] =
 
-    useState<boolean>(false);
+    useState<boolean>(false);
 
 
 
-  const [casesError, setCasesError] =
+  const [casesError, setCasesError] =
 
-    useState<string | null>(null);
+    useState<string | null>(null);
 
 
 
-  const [isUploadOpen, setIsUploadOpen] =
+  const [isUploadOpen, setIsUploadOpen] =
 
-    useState<boolean>(false);
+    useState<boolean>(false);
 
 
 
-  const [isReportOpen, setIsReportOpen] =
+  const [isReportOpen, setIsReportOpen] =
 
-    useState<boolean>(false);
+    useState<boolean>(false);
 
 
 
-  const [isSettingsOpen, setIsSettingsOpen] =
+  const [isSettingsOpen, setIsSettingsOpen] =
 
-    useState<boolean>(false);
+    useState<boolean>(false);
 
 
 
-  const [isMeasurementActive, setIsMeasurementActive] =
+  const [isMeasurementActive, setIsMeasurementActive] =
 
-    useState<boolean>(false);
+    useState<boolean>(false);
 
 
 
-  const [isAngleActive, setIsAngleActive] =
+  const [isAngleActive, setIsAngleActive] =
 
-    useState<boolean>(false);
+    useState<boolean>(false);
 
 
 
-  const loadCases = async () => {
+  const loadCases = async () => {
 
-    setIsLoadingCases(true);
+    setIsLoadingCases(true);
 
-    setCasesError(null);
+    setCasesError(null);
 
 
 
-    const { data, error } = await supabase
+    const { data, error } = await supabase
 
-      .from('cases')
+      .from('cases')
 
-      .select(`
+      .select(`
 
-        id,
+        id,
 
-        part_body,
+        part_body,
 
-        status,
+        status,
 
-        priority,
+        priority,
 
-        at_created,
+        summary_clinical,
 
+        at_created,
 
 
-        patients!cases_patient_clinic_fk (
 
-          id,
+        patients!cases_patient_clinic_fk (
 
-          name_full,
+          id,
 
-          number_record_medical,
+          name_full,
 
-          sex,
+          number_record_medical,
 
-          birth_of_date
+          sex,
 
-        ),
+          birth_of_date
 
+        ),
 
 
-        images_xray (
 
-          id,
+        images_xray (
 
-          filename_original,
+          id,
 
-          status_inference,
+          filename_original,
 
-          path_storage,
+          status_inference,
 
-          bucket_storage,
+          path_storage,
 
+          bucket_storage,
 
 
-          predictions_ai (
 
-            id,
+          predictions_ai (
 
-            status,
+            id,
 
-            detected_fracture,
+            status,
 
-            confidence_overall,
+            detected_fracture,
 
-            response_raw,
+            confidence_overall,
 
-            message_error,
+            response_raw,
 
-            ms_processing,
+            message_error,
 
-            at_created,
+            ms_processing,
 
+            at_created,
 
 
-            boxes_prediction (
 
-              id,
+            boxes_prediction (
 
-              id_type_fracture,
+              id,
 
-              min_x,
+              id_type_fracture,
 
-              min_y,
+              min_x,
 
-              max_x,
+              min_y,
 
-              max_y,
+              max_x,
 
-              confidence,
+              max_y,
 
-              label,
+              confidence,
 
-              at_created,
+              label,
 
+              at_created,
 
 
-              types_fracture (
 
-                id,
+              types_fracture (
 
-                code,
+                id,
 
-                en_label,
+                code,
 
-                ar_label,
+                en_label,
 
-                description
+                ar_label,
 
-              )
+                description
 
-            )
+              )
 
-          )
+            )
 
-        )
+          )
 
-      `)
+        )
 
-      .order('at_created', {
+      `)
 
-        ascending: false,
+      .order('at_created', {
 
-      });
+        ascending: false,
 
+      });
 
 
-    if (error) {
 
-      console.error(
+    if (error) {
 
-        'Error loading cases:',
+      console.error(
 
-        error
+        'Error loading cases:',
 
-      );
+        error
 
+      );
 
 
-      setCasesError(error.message);
 
-      setScans([]);
+      setCasesError(error.message);
 
-      setCurrentScan(null);
+      setScans([]);
 
-      setIsLoadingCases(false);
+      setCurrentScan(null);
 
+      setIsLoadingCases(false);
 
 
-      return;
 
-    }
+      return;
 
+    }
 
 
-    const rows =
 
-      (data || []) as SupabaseCaseRow[];
+    const rows =
 
+      (data || []) as SupabaseCaseRow[];
 
 
-    const mappedScans = await Promise.all(
 
-      rows.map(async (row) => {
+    const mappedScans = await Promise.all(
 
-        const scan =
+      rows.map(async (row) => {
 
-          mapCaseToScanRecord(row);
+        const scan =
 
+          mapCaseToScanRecord(row);
 
 
-        const image =
 
-          Array.isArray(row.images_xray)
+        const image =
 
-            ? row.images_xray[0]
+          Array.isArray(row.images_xray)
 
-            : undefined;
+            ? row.images_xray[0]
 
+            : undefined;
 
 
-        if (
 
-          image?.path_storage &&
+        if (
 
-          image?.bucket_storage
+          image?.path_storage &&
 
-        ) {
+          image?.bucket_storage
 
-          const {
+        ) {
 
-            data: signedUrlData,
+          const {
 
-            error: signedUrlError,
+            data: signedUrlData,
 
-          } = await supabase.storage
+            error: signedUrlError,
 
-            .from(image.bucket_storage)
+          } = await supabase.storage
 
-            .createSignedUrl(
+            .from(image.bucket_storage)
 
-              image.path_storage,
+            .createSignedUrl(
 
-              60 * 60
+              image.path_storage,
 
-            );
+              60 * 60
 
+            );
 
 
-          if (signedUrlError) {
 
-            console.error(
+          if (signedUrlError) {
 
-              'Error creating X-Ray signed URL:',
+            console.error(
 
-              signedUrlError
+              'Error creating X-Ray signed URL:',
 
-            );
+              signedUrlError
 
-          } else if (
+            );
 
-            signedUrlData?.signedUrl
+          } else if (
 
-          ) {
+            signedUrlData?.signedUrl
 
-            scan.imageUrl =
+          ) {
 
-              signedUrlData.signedUrl;
+            scan.imageUrl =
 
-          }
+              signedUrlData.signedUrl;
 
-        }
+          }
 
+        }
 
 
-        return scan;
 
-      })
+        return scan;
 
-    );
+      })
 
+    );
 
 
-    setScans(mappedScans);
 
+    setScans(mappedScans);
 
 
-    setCurrentScan((previousScan) => {
 
-      if (previousScan) {
+    setCurrentScan((previousScan) => {
 
-        const refreshedScan =
+      if (previousScan) {
 
-          mappedScans.find(
+        const refreshedScan =
 
-            (scan) =>
+          mappedScans.find(
 
-              scan.id === previousScan.id
+            (scan) =>
 
-          );
+              scan.id === previousScan.id
 
+          );
 
 
-        if (refreshedScan) {
 
-          return refreshedScan;
+        if (refreshedScan) {
 
-        }
+          return refreshedScan;
 
-      }
+        }
 
+      }
 
 
-      return mappedScans[0] || null;
 
-    });
+      return mappedScans[0] || null;
 
+    });
 
 
-    console.log(
 
-      'Cases loaded from Supabase:',
+    console.log(
 
-      mappedScans
+      'Cases loaded from Supabase:',
 
-    );
+      mappedScans
 
+    );
 
 
-    setIsLoadingCases(false);
 
-  };
+    setIsLoadingCases(false);
 
+  };
 
 
-  useEffect(() => {
+
+  useEffect(() => {
     let mounted = true;
 
     const initializeAuth = async () => {
@@ -909,253 +930,253 @@ export function App() {
 
 
 
-  const filteredScans = scans.filter((s) => {
+  const filteredScans = scans.filter((s) => {
 
-    if (!searchQuery.trim()) {
+    if (!searchQuery.trim()) {
 
-      return true;
+      return true;
 
-    }
+    }
 
 
 
-    const q =
+    const q =
 
-      searchQuery.toLowerCase();
+      searchQuery.toLowerCase();
 
 
 
-    return (
+    return (
 
-      s.id.toLowerCase().includes(q) ||
+      s.id.toLowerCase().includes(q) ||
 
-      s.patientName
+      s.patientName
 
-        .toLowerCase()
+        .toLowerCase()
 
-        .includes(q) ||
+        .includes(q) ||
 
-      s.region
+      s.region
 
-        .toLowerCase()
+        .toLowerCase()
 
-        .includes(q) ||
+        .includes(q) ||
 
-      s.primaryFinding
+      s.primaryFinding
 
-        .toLowerCase()
+        .toLowerCase()
 
-        .includes(q)
+        .includes(q)
 
-    );
+    );
 
-  });
+  });
 
 
 
-  const handleSelectTab = (
+  const handleSelectTab = (
 
-    tab: PageTab
+    tab: PageTab
 
-  ) => {
+  ) => {
 
-    if (tab === 'upload') {
+    if (tab === 'upload') {
 
-      setIsUploadOpen(true);
+      setIsUploadOpen(true);
 
-      return;
+      return;
 
-    }
+    }
 
 
 
-    if (tab === 'report') {
+    if (tab === 'report') {
 
-      if (currentScan) {
+      if (currentScan) {
 
-        setIsReportOpen(true);
+        setIsReportOpen(true);
 
-      }
+      }
 
 
 
-      return;
+      return;
 
-    }
+    }
 
 
 
-    if (tab === 'heatmap') {
+    if (tab === 'heatmap') {
 
-      setActiveTab('detect');
+      setActiveTab('detect');
 
-      return;
+      return;
 
-    }
+    }
 
 
 
-    if (tab === 'measurement') {
+    if (tab === 'measurement') {
 
-      setActiveTab('detect');
+      setActiveTab('detect');
 
-      setIsMeasurementActive(true);
+      setIsMeasurementActive(true);
 
-      setIsAngleActive(false);
+      setIsAngleActive(false);
 
 
 
-      return;
+      return;
 
-    }
+    }
 
 
 
-    if (tab === 'angle') {
+    if (tab === 'angle') {
 
-      setActiveTab('detect');
+      setActiveTab('detect');
 
-      setIsAngleActive(true);
+      setIsAngleActive(true);
 
-      setIsMeasurementActive(false);
+      setIsMeasurementActive(false);
 
 
 
-      return;
+      return;
 
-    }
+    }
 
 
 
-    setActiveTab(tab);
+    setActiveTab(tab);
 
-  };
+  };
 
 
 
-  const handleScanCreated = (
+  const handleScanCreated = (
 
-    newScan: ScanRecord
+    newScan: ScanRecord
 
-  ) => {
+  ) => {
 
-    setScans((previousScans) => [
+    setScans((previousScans) => [
 
-      newScan,
+      newScan,
 
-      ...previousScans,
+      ...previousScans,
 
-    ]);
+    ]);
 
 
 
-    setCurrentScan(newScan);
+    setCurrentScan(newScan);
 
-    setActiveTab('detect');
+    setActiveTab('detect');
 
 
 
-    void loadCases();
+    void loadCases();
 
-  };
+  };
 
 
 
-  const handleUpdateScan = (
+  const handleUpdateScan = (
 
-    updatedScan: ScanRecord
+    updatedScan: ScanRecord
 
-  ) => {
+  ) => {
 
-    setScans((previousScans) =>
+    setScans((previousScans) =>
 
-      previousScans.map((scan) =>
+      previousScans.map((scan) =>
 
-        scan.id === updatedScan.id
+        scan.id === updatedScan.id
 
-          ? updatedScan
+          ? updatedScan
 
-          : scan
+          : scan
 
-      )
+      )
 
-    );
+    );
 
 
 
-    setCurrentScan((previousScan) =>
+    setCurrentScan((previousScan) =>
 
-      previousScan?.id === updatedScan.id
+      previousScan?.id === updatedScan.id
 
-        ? updatedScan
+        ? updatedScan
 
-        : previousScan
+        : previousScan
 
-    );
+    );
 
-  };
+  };
 
 
 
-  const handleLogout = async () => {
+  const handleLogout = async () => {
 
-    const { error } =
+    const { error } =
 
-      await supabase.auth.signOut();
+      await supabase.auth.signOut();
 
 
 
-    if (error) {
+    if (error) {
 
-      console.error(
+      console.error(
 
-        'Logout error:',
+        'Logout error:',
 
-        error
+        error
 
-      );
+      );
 
 
 
-      return;
+      return;
 
-    }
+    }
 
 
 
-    setIsAuthenticated(false);
+    setIsAuthenticated(false);
 
-    setActiveTab('dashboard');
+    setActiveTab('dashboard');
 
-    setCurrentScan(null);
+    setCurrentScan(null);
 
-    setScans([]);
+    setScans([]);
 
-  };
+  };
 
 
 
-  if (showSplash) {
+  if (showSplash) {
 
-    return (
+    return (
 
-      <SplashScreen
+      <SplashScreen
 
-        onComplete={() =>
+        onComplete={() =>
 
-          setShowSplash(false)
+          setShowSplash(false)
 
-        }
+        }
 
-      />
+      />
 
-    );
+    );
 
-  }
+  }
 
 
 
-  if (!authReady) {
+  if (!authReady) {
     return (
       <div className="min-h-screen bg-[#020617] text-white flex items-center justify-center">
         <div className="text-sm text-slate-400">Checking authentication...</div>
@@ -1165,11 +1186,11 @@ export function App() {
 
   if (!isAuthenticated) {
 
-    return (
+    return (
 
-      <AuthLayout
+      <AuthLayout
 
-        onLoginSuccess={async () => {
+        onLoginSuccess={async () => {
           const { data: { session } } = await supabase.auth.getSession();
           if (!session?.user) {
             console.error('Login completed but no Supabase session is available.');
@@ -1180,487 +1201,487 @@ export function App() {
           setAuthReady(true);
         }}
 
-      />
+      />
 
-    );
+    );
 
-  }
+  }
 
 
 
-  return (
+  return (
 
-    <div
+    <div
 
-      className={`min-h-screen bg-[#020617] text-slate-100 medical-net-bg selection:bg-cyan-500 selection:text-white ${
+      className={`min-h-screen bg-[#020617] text-slate-100 medical-net-bg selection:bg-cyan-500 selection:text-white ${
 
-        lang === 'ar'
+        lang === 'ar'
 
-          ? 'rtl'
+          ? 'rtl'
 
-          : 'ltr'
+          : 'ltr'
 
-      }`}
+      }`}
 
-    >
+    >
 
-      <div className="print:hidden">
+      <div className="print:hidden">
 
-        <Sidebar
+        <Sidebar
 
-          activeTab={activeTab}
+          activeTab={activeTab}
 
-          onSelectTab={handleSelectTab}
+          onSelectTab={handleSelectTab}
 
-          criticalCount={
+          criticalCount={
 
-            scans.filter(
+            scans.filter(
 
-              (scan) =>
+              (scan) =>
 
-                scan.status === 'Critical'
+                scan.status === 'Critical'
 
-            ).length
+            ).length
 
-          }
+          }
 
-        />
+        />
 
-      </div>
+      </div>
 
 
 
-      <div className="md:ml-64 flex flex-col min-h-screen print:hidden">
+      <div className="md:ml-64 flex flex-col min-h-screen print:hidden">
 
 
 
-        {currentScan && (
+        {currentScan && (
 
-          <Header
+          <Header
 
-            currentScan={currentScan}
+            currentScan={currentScan}
 
-            activeTab={activeTab}
+            activeTab={activeTab}
 
-            onSelectTab={handleSelectTab}
+            onSelectTab={handleSelectTab}
 
-            searchQuery={searchQuery}
+            searchQuery={searchQuery}
 
-            onSearchChange={setSearchQuery}
+            onSearchChange={setSearchQuery}
 
-            onOpenSettings={() =>
+            onOpenSettings={() =>
 
-              setIsSettingsOpen(true)
+              setIsSettingsOpen(true)
 
-            }
+            }
 
-            onOpenUpload={() =>
+            onOpenUpload={() =>
 
-              setIsUploadOpen(true)
+              setIsUploadOpen(true)
 
-            }
+            }
 
-            lang={lang}
+            lang={lang}
 
-            onToggleLang={() =>
+            onToggleLang={() =>
 
-              setLang((previousLang) =>
+              setLang((previousLang) =>
 
-                previousLang === 'en'
+                previousLang === 'en'
 
-                  ? 'ar'
+                  ? 'ar'
 
-                  : 'en'
+                  : 'en'
 
-              )
+              )
 
-            }
+            }
 
-          />
+          />
 
-        )}
+        )}
 
 
 
-        <main className="flex-1 pt-20 px-4 md:px-8 max-w-[1600px] w-full mx-auto relative">
+        <main className="flex-1 pt-20 px-4 md:px-8 max-w-[1600px] w-full mx-auto relative">
 
 
 
-          {isLoadingCases && (
+          {isLoadingCases && (
 
-            <div className="mb-4 rounded-xl border border-cyan-500/20 bg-cyan-500/5 px-4 py-3 text-sm text-cyan-300">
+            <div className="mb-4 rounded-xl border border-cyan-500/20 bg-cyan-500/5 px-4 py-3 text-sm text-cyan-300">
 
-              Loading cases from Supabase...
+              Loading cases from Supabase...
 
-            </div>
+            </div>
 
-          )}
+          )}
 
 
 
-          {casesError && (
+          {casesError && (
 
-            <div className="mb-4 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-300">
+            <div className="mb-4 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-300">
 
-              Failed to load cases:{' '}
+              Failed to load cases:{' '}
 
-              {casesError}
+              {casesError}
 
-            </div>
+            </div>
 
-          )}
+          )}
 
 
 
-          {activeTab === 'dashboard' && (
+          {activeTab === 'dashboard' && (
 
-            <DashboardView
+            <DashboardView
 
-              scans={filteredScans}
+              scans={filteredScans}
 
-              onSelectScan={(scan) => {
+              onSelectScan={(scan) => {
 
-                setCurrentScan(scan);
+                setCurrentScan(scan);
 
-                setActiveTab('detect');
+                setActiveTab('detect');
 
-              }}
+              }}
 
-              onNavigateTab={
+              onNavigateTab={
 
-                handleSelectTab
+                handleSelectTab
 
-              }
+              }
 
-            />
+            />
 
-          )}
+          )}
 
 
 
-          {(activeTab === 'detect' ||
+          {(activeTab === 'detect' ||
 
-            activeTab === 'analyze') &&
+            activeTab === 'analyze') &&
 
-            currentScan && (
+            currentScan && (
 
-              <div className="relative">
+              <div className="relative">
 
 
 
-                <DetectView
+                <DetectView
 
-                  scan={currentScan}
+                  scan={currentScan}
 
-                  onNavigateTab={
+                  onNavigateTab={
 
-                    handleSelectTab
+                    handleSelectTab
 
-                  }
+                  }
 
-                  onOpenReport={() =>
+                  onOpenReport={() =>
 
-                    setIsReportOpen(true)
+                    setIsReportOpen(true)
 
-                  }
+                  }
 
-                  onToggleMeasurementTool={() => {
+                  onToggleMeasurementTool={() => {
 
-                    setIsMeasurementActive(
+                    setIsMeasurementActive(
 
-                      (previous) =>
+                      (previous) =>
 
-                        !previous
+                        !previous
 
-                    );
+                    );
 
 
 
-                    setIsAngleActive(false);
+                    setIsAngleActive(false);
 
-                  }}
+                  }}
 
-                  onToggleAngleTool={() => {
+                  onToggleAngleTool={() => {
 
-                    setIsAngleActive(
+                    setIsAngleActive(
 
-                      (previous) =>
+                      (previous) =>
 
-                        !previous
+                        !previous
 
-                    );
+                    );
 
 
 
-                    setIsMeasurementActive(false);
+                    setIsMeasurementActive(false);
 
-                  }}
+                  }}
 
-                  isMeasurementActive={
+                  isMeasurementActive={
 
-                    isMeasurementActive
+                    isMeasurementActive
 
-                  }
+                  }
 
-                  isAngleActive={
+                  isAngleActive={
 
-                    isAngleActive
+                    isAngleActive
 
-                  }
+                  }
 
-                />
+                />
 
 
 
-                <ToolsOverlay
+                <ToolsOverlay
 
-                  isMeasurementActive={
+                  isMeasurementActive={
 
-                    isMeasurementActive
+                    isMeasurementActive
 
-                  }
+                  }
 
-                  isAngleActive={
+                  isAngleActive={
 
-                    isAngleActive
+                    isAngleActive
 
-                  }
+                  }
 
-                  onCloseTools={() => {
+                  onCloseTools={() => {
 
-                    setIsMeasurementActive(false);
+                    setIsMeasurementActive(false);
 
-                    setIsAngleActive(false);
+                    setIsAngleActive(false);
 
-                  }}
+                  }}
 
-                />
+                />
 
 
 
-              </div>
+              </div>
 
-            )}
+            )}
 
 
 
-          {(activeTab === 'detect' ||
+          {(activeTab === 'detect' ||
 
-            activeTab === 'analyze') &&
+            activeTab === 'analyze') &&
 
-            !currentScan &&
+            !currentScan &&
 
-            !isLoadingCases && (
+            !isLoadingCases && (
 
-              <div className="flex min-h-[400px] items-center justify-center">
+              <div className="flex min-h-[400px] items-center justify-center">
 
 
 
-                <div className="text-center">
+                <div className="text-center">
 
 
 
-                  <div className="material-symbols-outlined text-5xl text-slate-500 mb-3">
+                  <div className="material-symbols-outlined text-5xl text-slate-500 mb-3">
 
-                    image_search
+                    image_search
 
-                  </div>
+                  </div>
 
 
 
-                  <h2 className="text-lg font-semibold text-white">
+                  <h2 className="text-lg font-semibold text-white">
 
-                    No case selected
+                    No case selected
 
-                  </h2>
+                  </h2>
 
 
 
-                  <p className="mt-1 text-sm text-slate-400">
+                  <p className="mt-1 text-sm text-slate-400">
 
-                    Create or select a case to begin.
+                    Create or select a case to begin.
 
-                  </p>
+                  </p>
 
 
 
-                </div>
+                </div>
 
 
 
-              </div>
+              </div>
 
-            )}
+            )}
 
 
 
-          {activeTab === 'explain' &&
+          {activeTab === 'explain' &&
 
-            currentScan && (
+            currentScan && (
 
-              <ExplainView
+              <ExplainView
 
-                scan={currentScan}
+                scan={currentScan}
 
-                onOpenReportPrint={() =>
+                onOpenReportPrint={() =>
 
-                  setIsReportOpen(true)
+                  setIsReportOpen(true)
 
-                }
+                }
 
-              />
+              />
 
-            )}
+            )}
 
 
 
-          {activeTab === 'database' && (
+          {activeTab === 'database' && (
 
-            <DatabaseView
+            <DatabaseView
 
-              scans={filteredScans}
+              scans={filteredScans}
 
-              onSelectScan={(scan) => {
+              onSelectScan={(scan) => {
 
-                setCurrentScan(scan);
+                setCurrentScan(scan);
 
-                setActiveTab('case-details');
+                setActiveTab('case-details');
 
-              }}
+              }}
 
-              onNavigateTab={
+              onNavigateTab={
 
-                handleSelectTab
+                handleSelectTab
 
-              }
+              }
 
-              onOpenUpload={() =>
+              onOpenUpload={() =>
 
-                setIsUploadOpen(true)
+                setIsUploadOpen(true)
 
-              }
+              }
 
-            />
+            />
 
-          )}
+          )}
 
 
 
-          {activeTab === 'case-details' &&
+          {activeTab === 'case-details' &&
 
-            currentScan && (
+            currentScan && (
 
-              <CaseDetailsView
+              <CaseDetailsView
 
-                scan={currentScan}
+                scan={currentScan}
 
-                onNavigateTab={
+                onNavigateTab={
 
-                  handleSelectTab
+                  handleSelectTab
 
-                }
+                }
 
-                onBack={() =>
+                onBack={() =>
 
-                  setActiveTab('database')
+                  setActiveTab('database')
 
-                }
+                }
 
-              />
+              />
 
-            )}
+            )}
 
 
 
-          {activeTab === 'profile' && (
+          {activeTab === 'profile' && (
 
-            <ProfileView
+            <ProfileView
 
-              onLogout={handleLogout}
+              onLogout={handleLogout}
 
-            />
+            />
 
-          )}
+          )}
 
 
 
-          {activeTab === 'admin-management' && (
+          {activeTab === 'admin-management' && (
 
-            <AdminManagementView />
+            <AdminManagementView />
 
-          )}
+          )}
 
 
 
-        </main>
+        </main>
 
-      </div>
+      </div>
 
 
 
-      <UploadModal
+      <UploadModal
 
-        isOpen={isUploadOpen}
+        isOpen={isUploadOpen}
 
-        onClose={() =>
+        onClose={() =>
 
-          setIsUploadOpen(false)
+          setIsUploadOpen(false)
 
-        }
+        }
 
-        onScanCreated={
+        onScanCreated={
 
-          handleScanCreated
+          handleScanCreated
 
-        }
+        }
 
-      />
+      />
 
 
 
-      {currentScan && (
+      {currentScan && (
 
-        <ReportModal
+        <ReportModal
 
-          isOpen={isReportOpen}
+          isOpen={isReportOpen}
 
-          onClose={() =>
+          onClose={() =>
 
-            setIsReportOpen(false)
+            setIsReportOpen(false)
 
-          }
+          }
 
-          scan={currentScan}
+          scan={currentScan}
 
-          onUpdateScan={
+          onUpdateScan={
 
-            handleUpdateScan
+            handleUpdateScan
 
-          }
+          }
 
-        />
+        />
 
-      )}
+      )}
 
 
 
-      <SettingsModal
+      <SettingsModal
 
-        isOpen={isSettingsOpen}
+        isOpen={isSettingsOpen}
 
-        onClose={() =>
+        onClose={() =>
 
-          setIsSettingsOpen(false)
+          setIsSettingsOpen(false)
 
-        }
+        }
 
-      />
+      />
 
 
 
-    </div>
+    </div>
 
-  );
+  );
 
 }
 
