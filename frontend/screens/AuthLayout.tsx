@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { LoginPage } from './LoginPage';
 import { RegisterPage } from './RegisterPage';
 import { ForgotPasswordPage } from './ForgotPasswordPage';
-import { ShieldCheck, X, Sun, Moon } from 'lucide-react';
+import { LandingPage } from './LandingPage';
+import { ShieldCheck, X, Sun, Moon, ArrowRight } from 'lucide-react';
 
 interface AuthLayoutProps {
   onLoginSuccess: () => void;
@@ -15,10 +16,10 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
   theme = 'dark',
   onToggleTheme,
 }) => {
-  const [currentView, setCurrentView] = useState<'login' | 'register' | 'forgot_password'>('login');
+  const [currentView, setCurrentView] = useState<'landing' | 'login' | 'register' | 'forgot_password'>('landing');
   const [registrationNotice, setRegistrationNotice] = useState<string | null>(null);
 
-  const handleNavigate = (view: 'login' | 'register' | 'forgot_password') => {
+  const handleNavigate = (view: 'landing' | 'login' | 'register' | 'forgot_password') => {
     setCurrentView(view);
   };
 
@@ -30,26 +31,50 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
     setCurrentView('login');
   };
 
-  const themeToggleButton = onToggleTheme ? (
-    <button
-      type="button"
-      onClick={onToggleTheme}
-      className="fixed top-5 right-5 z-50 px-3 py-1.5 rounded-full border border-white/15 bg-[#0D1626]/80 backdrop-blur-md text-xs font-semibold text-[#bcc8ce] hover:text-white hover:border-[#00B4DB]/60 shadow-lg transition-all flex items-center gap-1.5"
-      title={theme === 'dark' ? 'Switch to Day Mode' : 'Switch to Night Mode'}
-    >
-      {theme === 'dark' ? (
-        <>
-          <Sun size={15} className="text-amber-400" />
-          <span>Day Mode</span>
-        </>
-      ) : (
-        <>
-          <Moon size={15} className="text-sky-600" />
-          <span>Night Mode</span>
-        </>
+  if (currentView === 'landing') {
+    return (
+      <LandingPage
+        onGoToLogin={() => handleNavigate('login')}
+        theme={theme}
+        onToggleTheme={onToggleTheme || (() => {})}
+      />
+    );
+  }
+
+  const themeToggleButton = (
+    <div className="fixed top-5 right-5 z-50 flex items-center gap-2">
+      <button
+        type="button"
+        onClick={() => handleNavigate('landing')}
+        className="px-3 py-1.5 rounded-full border border-white/15 bg-[#0D1626]/80 backdrop-blur-md text-xs font-semibold text-[#bcc8ce] hover:text-white hover:border-[#00B4DB]/60 shadow-lg transition-all flex items-center gap-1.5 cursor-pointer"
+        title="العودة إلى الصفحة الرئيسية"
+      >
+        <ArrowRight size={14} />
+        <span>الرئيسية</span>
+      </button>
+
+      {onToggleTheme && (
+        <button
+          type="button"
+          onClick={onToggleTheme}
+          className="px-3 py-1.5 rounded-full border border-white/15 bg-[#0D1626]/80 backdrop-blur-md text-xs font-semibold text-[#bcc8ce] hover:text-white hover:border-[#00B4DB]/60 shadow-lg transition-all flex items-center gap-1.5 cursor-pointer"
+          title={theme === 'dark' ? 'Switch to Day Mode' : 'Switch to Night Mode'}
+        >
+          {theme === 'dark' ? (
+            <>
+              <Sun size={15} className="text-amber-400" />
+              <span>Day Mode</span>
+            </>
+          ) : (
+            <>
+              <Moon size={15} className="text-sky-600" />
+              <span>Night Mode</span>
+            </>
+          )}
+        </button>
       )}
-    </button>
-  ) : null;
+    </div>
+  );
 
   if (currentView === 'register') {
     return (
