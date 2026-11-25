@@ -541,6 +541,25 @@ export function App() {
 
     useState<'en' | 'ar'>('en');
 
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = window.localStorage.getItem('fractureai_theme');
+      if (saved === 'light' || saved === 'dark') return saved;
+    }
+    return 'dark';
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.remove('dark', 'light');
+    root.classList.add(theme);
+    window.localStorage.setItem('fractureai_theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
 
 
   const [isLoadingCases, setIsLoadingCases] =
@@ -1190,6 +1209,10 @@ export function App() {
 
       <AuthLayout
 
+        theme={theme}
+
+        onToggleTheme={toggleTheme}
+
         onLoginSuccess={async () => {
           const { data: { session } } = await supabase.auth.getSession();
           if (!session?.user) {
@@ -1296,6 +1319,10 @@ export function App() {
               )
 
             }
+
+            theme={theme}
+
+            onToggleTheme={toggleTheme}
 
           />
 
@@ -1674,6 +1701,10 @@ export function App() {
           setIsSettingsOpen(false)
 
         }
+
+        theme={theme}
+
+        onChangeTheme={setTheme}
 
       />
 

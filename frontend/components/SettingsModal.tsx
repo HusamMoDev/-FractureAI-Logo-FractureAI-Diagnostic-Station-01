@@ -3,9 +3,16 @@ import React, { useState } from 'react';
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  theme: 'dark' | 'light';
+  onChangeTheme: (theme: 'dark' | 'light') => void;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({
+  isOpen,
+  onClose,
+  theme,
+  onChangeTheme,
+}) => {
   const [aiConfidenceCutoff, setAiConfidenceCutoff] = useState<number>(75);
   const [enableHeatmaps, setEnableHeatmaps] = useState<boolean>(true);
   const [radiologistName, setRadiologistName] = useState('Dr. S. Chen');
@@ -36,6 +43,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         </div>
 
         <div className="space-y-4 text-xs text-[#dae4eb]">
+          {/* Appearance / Theme */}
+          <div className="space-y-2">
+            <h4 className="font-semibold text-[#4cd6fe] uppercase tracking-wider text-[10px]">
+              APPEARANCE / THEME
+            </h4>
+            <div className="bg-[#0D1626] p-3 rounded-lg border border-white/10 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => onChangeTheme('light')}
+                className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-xs font-semibold transition-all ${theme === 'light'
+                    ? 'bg-[#00B4DB]/20 border-[#00B4DB] text-[#4cd6fe]'
+                    : 'border-white/10 text-[#bcc8ce] hover:border-white/20'
+                  }`}
+              >
+                <span className="material-symbols-outlined text-[18px]">light_mode</span>
+                <span>Day Mode (نهاري)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onChangeTheme('dark')}
+                className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-xs font-semibold transition-all ${theme === 'dark'
+                    ? 'bg-[#00B4DB]/20 border-[#00B4DB] text-[#4cd6fe]'
+                    : 'border-white/10 text-[#bcc8ce] hover:border-white/20'
+                  }`}
+              >
+                <span className="material-symbols-outlined text-[18px]">dark_mode</span>
+                <span>Night Mode (ليلي)</span>
+              </button>
+            </div>
+          </div>
+
           {/* AI Thresholds */}
           <div className="space-y-2">
             <h4 className="font-semibold text-[#4cd6fe] uppercase tracking-wider text-[10px]">

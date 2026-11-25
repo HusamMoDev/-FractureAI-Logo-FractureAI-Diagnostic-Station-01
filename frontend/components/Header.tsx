@@ -12,6 +12,8 @@ interface HeaderProps {
   onOpenUpload: () => void;
   lang: 'en' | 'ar';
   onToggleLang: () => void;
+  theme: 'dark' | 'light';
+  onToggleTheme: () => void;
 }
 
 interface UserProfile {
@@ -31,6 +33,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenUpload,
   lang,
   onToggleLang,
+  theme,
+  onToggleTheme,
 }) => {
   const logoUrl = '/logo.png';
 
@@ -116,6 +120,23 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Action Controls & Notifications */}
       <div className="flex items-center gap-3">
+
+        {/* Theme Switcher */}
+        <button
+          onClick={onToggleTheme}
+          className="px-2.5 py-1 text-xs font-medium rounded-full border border-white/10 hover:border-[#00B4DB]/50 text-[#bcc8ce] hover:text-white transition-colors flex items-center gap-1"
+          title={theme === 'dark' ? 'Switch to Day Mode' : 'Switch to Night Mode'}
+        >
+          <span className="material-symbols-outlined text-sm">
+            {theme === 'dark' ? 'light_mode' : 'dark_mode'}
+          </span>
+
+          <span className="hidden sm:inline">
+            {theme === 'dark'
+              ? lang === 'ar' ? 'نهاري' : 'Day'
+              : lang === 'ar' ? 'ليلي' : 'Night'}
+          </span>
+        </button>
 
         {/* Language Switcher */}
         <button
