@@ -923,9 +923,9 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   return (
     <div
       ref={reportModalRef}
-      className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-start justify-center p-4 overflow-y-auto"
+      className="print-modal-backdrop fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-start justify-center p-4 overflow-y-auto print:static print:block print:inset-auto print:overflow-visible print:bg-white print:p-0 print:backdrop-blur-none"
     >
-      <div className="print-modal bg-white text-slate-900 rounded-2xl max-w-6xl w-full shadow-2xl overflow-hidden my-6">
+      <div className="print-modal bg-white text-slate-900 rounded-2xl max-w-6xl w-full shadow-2xl overflow-hidden my-6 print:overflow-visible print:rounded-none print:my-0 print:shadow-none print:max-w-none print:w-full">
 
         {/* HEADER */}
         <div className="border-b border-slate-200 px-6 py-5">
@@ -1499,8 +1499,11 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                           ? 'Review or enter the clinical findings for this no-fracture study...'
                           : 'AI findings will appear here after real inference. The clinician may enter findings manually.'
                     }
-                    className="w-full min-h-[120px] rounded-lg border border-slate-200 bg-white p-3 text-xs leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-400 disabled:bg-slate-100 disabled:text-slate-500"
+                    className="w-full min-h-[120px] rounded-lg border border-slate-200 bg-white p-3 text-xs leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-400 disabled:bg-slate-100 disabled:text-slate-500 print:hidden"
                   />
+                  <div className="hidden print:block w-full min-h-[60px] rounded-lg border border-slate-200 bg-white p-3 text-xs leading-relaxed whitespace-pre-wrap text-slate-800">
+                    {findings || 'No findings recorded.'}
+                  </div>
                 </div>
 
                 {/* IMPRESSION */}
@@ -1516,8 +1519,11 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                       setImpression(e.target.value)
                     }
                     placeholder="Enter the final clinical impression..."
-                    className="w-full min-h-[100px] rounded-lg border border-slate-200 bg-white p-3 text-xs leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-400 disabled:bg-slate-100 disabled:text-slate-500"
+                    className="w-full min-h-[100px] rounded-lg border border-slate-200 bg-white p-3 text-xs leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-400 disabled:bg-slate-100 disabled:text-slate-500 print:hidden"
                   />
+                  <div className="hidden print:block w-full min-h-[50px] rounded-lg border border-slate-200 bg-white p-3 text-xs leading-relaxed whitespace-pre-wrap text-slate-800">
+                    {impression || 'No clinical impression recorded.'}
+                  </div>
                 </div>
 
                 {/* RECOMMENDATIONS */}
@@ -1535,8 +1541,11 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                       )
                     }
                     placeholder="Enter recommendations or follow-up instructions..."
-                    className="w-full min-h-[90px] rounded-lg border border-slate-200 bg-white p-3 text-xs leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-400 disabled:bg-slate-100 disabled:text-slate-500"
+                    className="w-full min-h-[90px] rounded-lg border border-slate-200 bg-white p-3 text-xs leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-400 disabled:bg-slate-100 disabled:text-slate-500 print:hidden"
                   />
+                  <div className="hidden print:block w-full min-h-[45px] rounded-lg border border-slate-200 bg-white p-3 text-xs leading-relaxed whitespace-pre-wrap text-slate-800">
+                    {recommendations || 'No recommendations recorded.'}
+                  </div>
                 </div>
 
                 {/* DOCTOR NOTES */}
@@ -1554,8 +1563,11 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                       )
                     }
                     placeholder="Optional notes for the reviewing physician..."
-                    className="w-full min-h-[70px] rounded-lg border border-slate-200 bg-white p-3 text-xs leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-400 disabled:bg-slate-100 disabled:text-slate-500"
+                    className="w-full min-h-[70px] rounded-lg border border-slate-200 bg-white p-3 text-xs leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-400 disabled:bg-slate-100 disabled:text-slate-500 print:hidden"
                   />
+                  <div className="hidden print:block w-full min-h-[40px] rounded-lg border border-slate-200 bg-white p-3 text-xs leading-relaxed whitespace-pre-wrap text-slate-800">
+                    {doctorNotes || 'No additional doctor notes.'}
+                  </div>
                 </div>
               </section>
             </div>
